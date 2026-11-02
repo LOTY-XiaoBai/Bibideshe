@@ -319,13 +319,17 @@ function onIdInput(value) {
 function onSecretKeydown(event) {
   if (adminMode.value) return
 
-  if (event.ctrlKey && (event.key === '6' || event.code === 'Digit6')) {
+  // 输入法组合、自动化或部分浏览器事件可能没有 key。
+  // 在读取 length 前先归一化，避免全局 keydown 处理器抛异常。
+  const key = typeof event?.key === 'string' ? event.key : ''
+
+  if (event.ctrlKey && (key === '6' || event.code === 'Digit6')) {
     event.preventDefault()
     secretBuffer.value = ''
     return
   }
 
-  if (event.key === 'Enter') {
+  if (key === 'Enter') {
     if (secretBuffer.value === ADMIN_SECRET) {
       event.preventDefault()
       event.stopPropagation()
@@ -335,12 +339,12 @@ function onSecretKeydown(event) {
     return
   }
 
-  if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-    const next = secretBuffer.value + event.key
+  if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    const next = secretBuffer.value + key
     if (ADMIN_SECRET.startsWith(next)) {
       secretBuffer.value = next
-    } else if (ADMIN_SECRET.startsWith(event.key)) {
-      secretBuffer.value = event.key
+    } else if (ADMIN_SECRET.startsWith(key)) {
+      secretBuffer.value = key
     } else {
       secretBuffer.value = ''
     }
