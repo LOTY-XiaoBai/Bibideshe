@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.QuestionChoiceOptionMapper">
+
+    <resultMap id="OptionResultMap" type="com.example.bishe.entity.QuestionChoiceOption">
+        <id column="question_id" property="questionId"/>
+        <id column="option_code" property="optionCode"/>
+        <result column="option_content" property="optionContent"/>
+    </resultMap>
+
+    <insert id="batchInsert">
+        INSERT INTO question_choice_option (question_id, option_code, option_content)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.questionId}, #{item.optionCode}, #{item.optionContent})
+        </foreach>
+    </insert>
+
+    <select id="findByQuestionId" resultMap="OptionResultMap">
+        SELECT * FROM question_choice_option WHERE question_id = #{questionId} ORDER BY option_code
+    </select>
+
+    <select id="findByQuestionIds" resultMap="OptionResultMap">
+        SELECT * FROM question_choice_option
+        WHERE question_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY question_id, option_code
+    </select>
+
+    <delete id="deleteByQuestionId">
+        DELETE FROM question_choice_option WHERE question_id = #{questionId}
+    </delete>
+
+    <delete id="deleteByPublisherId">
+        DELETE FROM question_choice_option
+        WHERE question_id IN (SELECT question_id FROM (SELECT question_id FROM question_choice WHERE publisher_id = #{publisherId}) t)
+    </delete>
+
+</mapper>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.ExamQuestionMapper">
+
+    <resultMap id="ExamQuestionResultMap" type="com.example.bishe.entity.ExamQuestion">
+        <id column="exam_id" property="examId"/>
+        <id column="question_id" property="questionId"/>
+        <id column="question_type" property="questionType"/>
+        <result column="score" property="score"/>
+    </resultMap>
+
+    <insert id="batchInsert">
+        INSERT INTO exam_question (exam_id, question_id, question_type, score)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.examId}, #{item.questionId}, #{item.questionType}, #{item.score})
+        </foreach>
+    </insert>
+
+    <select id="findByExamId" resultMap="ExamQuestionResultMap">
+        SELECT * FROM exam_question WHERE exam_id = #{examId}
+    </select>
+
+    <select id="find" resultMap="ExamQuestionResultMap">
+        SELECT * FROM exam_question
+        WHERE exam_id = #{examId} AND question_id = #{questionId} AND question_type = #{questionType}
+    </select>
+
+    <select id="findByQuestion" resultMap="ExamQuestionResultMap">
+        SELECT * FROM exam_question WHERE question_id = #{questionId} AND question_type = #{questionType}
+    </select>
+
+    <delete id="deleteByExamId">
+        DELETE FROM exam_question WHERE exam_id = #{examId}
+    </delete>
+
+    <delete id="deleteByCourseId">
+        DELETE FROM exam_question
+        WHERE exam_id IN (SELECT exam_id FROM (SELECT exam_id FROM exam WHERE course_id = #{courseId}) t)
+    </delete>
+
+    <delete id="deleteByPublisherId">
+        DELETE FROM exam_question
+        WHERE exam_id IN (SELECT exam_id FROM (SELECT exam_id FROM exam WHERE publisher_id = #{publisherId}) t)
+    </delete>
+
+</mapper>

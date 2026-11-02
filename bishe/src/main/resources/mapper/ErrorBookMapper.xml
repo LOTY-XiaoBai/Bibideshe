@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.ErrorBookMapper">
+
+    <resultMap id="ErrorBookResultMap" type="com.example.bishe.entity.ErrorBook">
+        <id column="student_id" property="studentId"/>
+        <id column="question_id" property="questionId"/>
+        <id column="question_type" property="questionType"/>
+        <result column="add_time" property="addTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.ErrorBook">
+        INSERT INTO error_book (student_id, question_id, question_type)
+        VALUES (#{studentId}, #{questionId}, #{questionType})
+    </insert>
+
+    <select id="find" resultMap="ErrorBookResultMap">
+        SELECT * FROM error_book
+        WHERE student_id = #{studentId} AND question_id = #{questionId} AND question_type = #{questionType}
+    </select>
+
+    <select id="findByStudentId" resultMap="ErrorBookResultMap">
+        SELECT * FROM error_book WHERE student_id = #{studentId} ORDER BY add_time DESC
+    </select>
+
+    <delete id="delete">
+        DELETE FROM error_book
+        WHERE student_id = #{studentId} AND question_id = #{questionId} AND question_type = #{questionType}
+    </delete>
+
+    <delete id="deleteByStudentId">
+        DELETE FROM error_book WHERE student_id = #{studentId}
+    </delete>
+
+</mapper>

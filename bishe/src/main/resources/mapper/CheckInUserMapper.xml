@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.CheckInUserMapper">
+
+    <resultMap id="CheckInUserResultMap" type="com.example.bishe.entity.CheckInUser">
+        <id column="check_in_id" property="checkInId"/>
+        <id column="student_id" property="studentId"/>
+        <result column="check_in_time" property="checkInTime"/>
+        <result column="status" property="status"/>
+    </resultMap>
+
+    <insert id="batchInsert">
+        INSERT INTO check_in_user (check_in_id, student_id, check_in_time, status)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.checkInId}, #{item.studentId}, #{item.checkInTime}, #{item.status})
+        </foreach>
+    </insert>
+
+    <update id="checkIn">
+        UPDATE check_in_user
+        SET status = #{status}, check_in_time = #{checkInTime}
+        WHERE check_in_id = #{checkInId} AND student_id = #{studentId}
+    </update>
+
+    <select id="findByCheckInIdAndStudentId" resultMap="CheckInUserResultMap">
+        SELECT * FROM check_in_user
+        WHERE check_in_id = #{checkInId} AND student_id = #{studentId}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE check_in_user
+        SET status = #{status}, check_in_time = #{checkInTime}
+        WHERE check_in_id = #{checkInId} AND student_id = #{studentId}
+    </update>
+
+    <!-- 查询某次签到的全部学生签到详情(含学生昵称) -->
+    <select id="findDetailsByCheckInId" resultType="com.example.bishe.dto.CheckInDetailVO">
+        SELECT
+            cir.check_in_id AS checkInId,
+            cir.publish_time AS publishTime,
+            cir.deadline AS deadline,
+            cir.end_time AS endTime,
+            cir.status AS checkInStatus,
+            ciu.student_id AS studentId,
+            s.nickname AS studentNickname,
+            ciu.check_in_time AS checkInTime,
+            ciu.status AS studentStatus
+        FROM check_in_user ciu
+        JOIN check_in_record cir ON ciu.check_in_id = cir.check_in_id
+        LEFT JOIN student s ON ciu.student_id = s.student_id
+        WHERE ciu.check_in_id = #{checkInId}
+        ORDER BY ciu.status ASC, ciu.student_id ASC
+    </select>
+
+    <!-- 查询某学生的全部签到记录(含课程名, 分页) -->
+    <select id="findRecordsByStudentId" resultType="com.example.bishe.dto.CheckInStudentRecordVO">
+        SELECT
+            ciu.check_in_id AS checkInId,
+            cir.course_id AS courseId,
+            c.course_name AS courseName,
+            cir.publish_time AS publishTime,
+            cir.deadline AS deadline,
+            ciu.check_in_time AS checkInTime,
+            ciu.status AS status,
+            cir.status AS checkInStatus
+        FROM check_in_user ciu
+        JOIN check_in_record cir ON ciu.check_in_id = cir.check_in_id
+        JOIN course c ON cir.course_id = c.course_id
+        WHERE ciu.student_id = #{studentId}
+        ORDER BY cir.publish_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByStudentId" resultType="int">
+        SELECT COUNT(*) FROM check_in_user WHERE student_id = #{studentId}
+    </select>
+
+    <!-- 查询某学生某课程下的漏签记录(缺勤) -->
+    <select id="findMissedByStudentIdAndCourseId" resultType="com.example.bishe.dto.CheckInStudentRecordVO">
+        SELECT
+            ciu.check_in_id AS checkInId,
+            cir.course_id AS courseId,
+            c.course_name AS courseName,
+            cir.publish_time AS publishTime,
+            cir.deadline AS deadline,
+            ciu.check_in_time AS checkInTime,
+            ciu.status AS status,
+            cir.status AS checkInStatus
+        FROM check_in_user ciu
+        JOIN check_in_record cir ON ciu.check_in_id = cir.check_in_id
+        JOIN course c ON cir.course_id = c.course_id
+        WHERE ciu.student_id = #{studentId}
+          AND cir.course_id = #{courseId}
+          AND ciu.status = 0
+        ORDER BY cir.publish_time DESC
+    </select>
+
+    <!-- 查询某学生全部漏签记录(分页) -->
+    <select id="findAllMissedByStudentId" resultType="com.example.bishe.dto.CheckInStudentRecordVO">
+        SELECT
+            ciu.check_in_id AS checkInId,
+            cir.course_id AS courseId,
+            c.course_name AS courseName,
+            cir.publish_time AS publishTime,
+            cir.deadline AS deadline,
+            ciu.check_in_time AS checkInTime,
+            ciu.status AS status,
+            cir.status AS checkInStatus
+        FROM check_in_user ciu
+        JOIN check_in_record cir ON ciu.check_in_id = cir.check_in_id
+        JOIN course c ON cir.course_id = c.course_id
+        WHERE ciu.student_id = #{studentId}
+          AND ciu.status = 0
+        ORDER BY cir.publish_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countMissedByStudentId" resultType="int">
+        SELECT COUNT(*) FROM check_in_user WHERE student_id = #{studentId} AND status = 0
+    </select>
+
+</mapper>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.UserHomeworkRecordMapper">
+
+    <resultMap id="UserHomeworkRecordResultMap" type="com.example.bishe.entity.UserHomeworkRecord">
+        <id column="student_id" property="studentId"/>
+        <id column="homework_id" property="homeworkId"/>
+        <result column="homework_score" property="homeworkScore"/>
+        <result column="teacher_score" property="teacherScore"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.UserHomeworkRecord">
+        INSERT INTO user_homework_record (student_id, homework_id, homework_score, teacher_score)
+        VALUES (#{studentId}, #{homeworkId}, #{homeworkScore}, #{teacherScore})
+    </insert>
+
+    <select id="find" resultMap="UserHomeworkRecordResultMap">
+        SELECT * FROM user_homework_record WHERE student_id = #{studentId} AND homework_id = #{homeworkId}
+    </select>
+
+    <select id="findByStudentId" resultMap="UserHomeworkRecordResultMap">
+        SELECT * FROM user_homework_record WHERE student_id = #{studentId}
+    </select>
+
+    <select id="findByHomeworkId" resultMap="UserHomeworkRecordResultMap">
+        SELECT * FROM user_homework_record WHERE homework_id = #{homeworkId}
+    </select>
+
+    <update id="updateHomeworkScore">
+        UPDATE user_homework_record SET homework_score = #{homeworkScore}
+        WHERE student_id = #{studentId} AND homework_id = #{homeworkId}
+    </update>
+
+    <update id="updateTeacherScore">
+        UPDATE user_homework_record SET teacher_score = #{teacherScore}
+        WHERE student_id = #{studentId} AND homework_id = #{homeworkId}
+    </update>
+
+    <delete id="deleteByCourseId">
+        DELETE FROM user_homework_record
+        WHERE homework_id IN (SELECT homework_id FROM (SELECT homework_id FROM homework WHERE course_id = #{courseId}) t)
+    </delete>
+
+    <delete id="deleteByStudentId">
+        DELETE FROM user_homework_record WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteByPublisherId">
+        DELETE FROM user_homework_record
+        WHERE homework_id IN (SELECT homework_id FROM (SELECT homework_id FROM homework WHERE publisher_id = #{publisherId}) t)
+    </delete>
+
+    <delete id="deleteByStudentAndHomework">
+        DELETE FROM user_homework_record
+        WHERE student_id = #{studentId} AND homework_id = #{homeworkId}
+    </delete>
+
+</mapper>

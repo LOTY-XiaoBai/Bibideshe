@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.HomeworkQuestionAnswerMapper">
+
+    <resultMap id="HomeworkQuestionAnswerResultMap" type="com.example.bishe.entity.HomeworkQuestionAnswer">
+        <id column="homework_id" property="homeworkId"/>
+        <id column="question_id" property="questionId"/>
+        <id column="question_type" property="questionType"/>
+        <id column="student_id" property="studentId"/>
+        <result column="course_id" property="courseId"/>
+        <result column="score" property="score"/>
+        <result column="annotation" property="annotation"/>
+        <result column="student_answer" property="studentAnswer"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.HomeworkQuestionAnswer">
+        INSERT INTO homework_question_answer
+            (homework_id, question_id, question_type, student_id, course_id, score, annotation, student_answer)
+        VALUES
+            (#{homeworkId}, #{questionId}, #{questionType}, #{studentId}, #{courseId}, #{score}, #{annotation}, #{studentAnswer})
+    </insert>
+
+    <update id="updateScore">
+        UPDATE homework_question_answer
+        SET score = #{score}, annotation = #{annotation}
+        WHERE homework_id = #{homeworkId} AND question_id = #{questionId}
+          AND question_type = #{questionType} AND student_id = #{studentId}
+    </update>
+
+    <select id="findByHomeworkAndStudent" resultMap="HomeworkQuestionAnswerResultMap">
+        SELECT * FROM homework_question_answer WHERE homework_id = #{homeworkId} AND student_id = #{studentId}
+    </select>
+
+    <select id="find" resultMap="HomeworkQuestionAnswerResultMap">
+        SELECT * FROM homework_question_answer
+        WHERE homework_id = #{homeworkId} AND question_id = #{questionId}
+          AND question_type = #{questionType} AND student_id = #{studentId}
+    </select>
+
+    <select id="countByHomeworkAndStudent" resultType="int">
+        SELECT COUNT(*) FROM homework_question_answer WHERE homework_id = #{homeworkId} AND student_id = #{studentId}
+    </select>
+
+    <select id="findByQuestion" resultMap="HomeworkQuestionAnswerResultMap">
+        SELECT * FROM homework_question_answer WHERE question_id = #{questionId} AND question_type = #{questionType}
+    </select>
+
+    <select id="findPendingSolveByHomework" resultMap="HomeworkQuestionAnswerResultMap">
+        SELECT * FROM homework_question_answer
+        WHERE homework_id = #{homeworkId}
+          AND question_type = 3
+          AND annotation = '待教师批改'
+    </select>
+
+    <select id="sumScoreByHomeworkAndStudent" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(score), 0) FROM homework_question_answer WHERE homework_id = #{homeworkId} AND student_id = #{studentId}
+    </select>
+
+    <delete id="deleteByCourseId">
+        DELETE FROM homework_question_answer WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteByStudentId">
+        DELETE FROM homework_question_answer WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteByPublisherId">
+        DELETE FROM homework_question_answer
+        WHERE homework_id IN (SELECT homework_id FROM (SELECT homework_id FROM homework WHERE publisher_id = #{publisherId}) t)
+    </delete>
+
+    <delete id="deleteByHomeworkAndStudent">
+        DELETE FROM homework_question_answer
+        WHERE homework_id = #{homeworkId} AND student_id = #{studentId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,116 @@
+:root {
+  --brand-blue: #66ccff;
+  --brand-mint: #00ffcc;
+  --brand-red: #ee0000;
+  --brand-blue-hover: #4db8ff;
+  --brand-mint-hover: #00e6b8;
+  --brand-red-hover: #cc0000;
+  --bg-light: #f3f6f8;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --border-color: #f3f4f6;
+  --sidebar-width: 256px;
+
+  --theme-primary: var(--brand-blue);
+  --theme-secondary: var(--brand-mint);
+  --theme-gradient: linear-gradient(135deg, var(--brand-blue), var(--brand-mint));
+  --theme-shadow: 0 10px 40px -10px rgba(102, 204, 255, 0.25);
+  --theme-active-bg: rgba(102, 204, 255, 0.12);
+  --theme-hover-bg: rgba(102, 204, 255, 0.08);
+}
+
+[data-role='teacher'] {
+  --theme-primary: var(--brand-red);
+  --theme-secondary: var(--brand-blue);
+  --theme-gradient: linear-gradient(135deg, var(--brand-blue), var(--brand-red));
+  --theme-shadow: 0 10px 40px -10px rgba(238, 0, 0, 0.2);
+  --theme-active-bg: rgba(238, 0, 0, 0.08);
+  --theme-hover-bg: rgba(238, 0, 0, 0.05);
+}
+
+[data-role='admin'] {
+  --theme-primary: #9999ff;
+  --theme-secondary: #66ccff;
+  --theme-gradient: linear-gradient(135deg, #9999ff, #66ccff);
+  --theme-shadow: 0 10px 40px -10px rgba(153, 153, 255, 0.3);
+  --theme-active-bg: rgba(153, 153, 255, 0.12);
+  --theme-hover-bg: rgba(102, 204, 255, 0.1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  background: var(--bg-light);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-blue);
+}
+
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.empty-page {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.empty-page h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.empty-page p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}

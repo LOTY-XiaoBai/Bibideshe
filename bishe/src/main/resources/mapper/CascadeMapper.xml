@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.CascadeMapper">
+
+    <!-- ============ 课程维度 ============ -->
+
+    <delete id="deleteExamAnswersByCourseId">
+        DELETE FROM exam_question_answer WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteExamQuestionsByCourseId">
+        DELETE FROM exam_question
+        WHERE exam_id IN (SELECT exam_id FROM (SELECT exam_id FROM exam WHERE course_id = #{courseId}) t)
+    </delete>
+
+    <delete id="deleteUserExamRecordsByCourseId">
+        DELETE FROM user_exam_record
+        WHERE exam_id IN (SELECT exam_id FROM (SELECT exam_id FROM exam WHERE course_id = #{courseId}) t)
+    </delete>
+
+    <delete id="deleteExamsByCourseId">
+        DELETE FROM exam WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteHomeworkAnswersByCourseId">
+        DELETE FROM homework_question_answer WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteHomeworkQuestionsByCourseId">
+        DELETE FROM homework_question
+        WHERE homework_id IN (SELECT homework_id FROM (SELECT homework_id FROM homework WHERE course_id = #{courseId}) t)
+    </delete>
+
+    <delete id="deleteUserHomeworkRecordsByCourseId">
+        DELETE FROM user_homework_record
+        WHERE homework_id IN (SELECT homework_id FROM (SELECT homework_id FROM homework WHERE course_id = #{courseId}) t)
+    </delete>
+
+    <delete id="deleteHomeworksByCourseId">
+        DELETE FROM homework WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteCheckInUsersByCourseId">
+        DELETE FROM check_in_user
+        WHERE check_in_id IN (SELECT check_in_id FROM (SELECT check_in_id FROM check_in_record WHERE course_id = #{courseId}) t)
+    </delete>
+
+    <delete id="deleteCheckInRecordsByCourseId">
+        DELETE FROM check_in_record WHERE course_id = #{courseId}
+    </delete>
+
+    <!-- ============ 学生维度 ============ -->
+
+    <delete id="deleteExamAnswersByStudentId">
+        DELETE FROM exam_question_answer WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteHomeworkAnswersByStudentId">
+        DELETE FROM homework_question_answer WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteUserExamRecordsByStudentId">
+        DELETE FROM user_exam_record WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteUserHomeworkRecordsByStudentId">
+        DELETE FROM user_homework_record WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteCheckInUsersByStudentId">
+        DELETE FROM check_in_user WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteErrorBookByStudentId">
+        DELETE FROM error_book WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteOrderEvaluationsByBuyerId">
+        DELETE FROM order_evaluation WHERE buyer_id = #{buyerId}
+    </delete>
+
+    <delete id="deleteOrderRecordsByBuyerId">
+        DELETE FROM order_record WHERE buyer_id = #{buyerId}
+    </delete>
+
+    <delete id="deleteTeacherEvaluationsByStudentId">
+        DELETE FROM teacher_evaluation WHERE student_id = #{studentId}
+    </delete>
+
+    <!-- ============ 教师维度 ============ -->
+
+    <delete id="deleteTeacherEvaluationsByTeacherId">
+        DELETE FROM teacher_evaluation WHERE teacher_id = #{teacherId}
+    </delete>
+
+    <delete id="deleteChoiceOptionsByTeacherId">
+        DELETE FROM question_choice_option
+        WHERE question_id IN (SELECT question_id FROM (SELECT question_id FROM question_choice WHERE publisher_id = #{teacherId}) t)
+    </delete>
+
+    <delete id="deleteChoiceQuestionsByTeacherId">
+        DELETE FROM question_choice WHERE publisher_id = #{teacherId}
+    </delete>
+
+    <delete id="deleteJudgeQuestionsByTeacherId">
+        DELETE FROM question_judge WHERE publisher_id = #{teacherId}
+    </delete>
+
+    <delete id="deleteAnswerQuestionsByTeacherId">
+        DELETE FROM question_answer WHERE publisher_id = #{teacherId}
+    </delete>
+
+</mapper>

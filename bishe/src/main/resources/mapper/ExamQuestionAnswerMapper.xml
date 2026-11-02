@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.ExamQuestionAnswerMapper">
+
+    <resultMap id="ExamQuestionAnswerResultMap" type="com.example.bishe.entity.ExamQuestionAnswer">
+        <id column="exam_id" property="examId"/>
+        <id column="question_id" property="questionId"/>
+        <id column="question_type" property="questionType"/>
+        <id column="student_id" property="studentId"/>
+        <result column="course_id" property="courseId"/>
+        <result column="score" property="score"/>
+        <result column="annotation" property="annotation"/>
+        <result column="student_answer" property="studentAnswer"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.ExamQuestionAnswer">
+        INSERT INTO exam_question_answer
+            (exam_id, question_id, question_type, student_id, course_id, score, annotation, student_answer)
+        VALUES
+            (#{examId}, #{questionId}, #{questionType}, #{studentId}, #{courseId}, #{score}, #{annotation}, #{studentAnswer})
+    </insert>
+
+    <update id="updateScore">
+        UPDATE exam_question_answer
+        SET score = #{score}, annotation = #{annotation}
+        WHERE exam_id = #{examId} AND question_id = #{questionId}
+          AND question_type = #{questionType} AND student_id = #{studentId}
+    </update>
+
+    <select id="findByExamAndStudent" resultMap="ExamQuestionAnswerResultMap">
+        SELECT * FROM exam_question_answer WHERE exam_id = #{examId} AND student_id = #{studentId}
+    </select>
+
+    <select id="find" resultMap="ExamQuestionAnswerResultMap">
+        SELECT * FROM exam_question_answer
+        WHERE exam_id = #{examId} AND question_id = #{questionId}
+          AND question_type = #{questionType} AND student_id = #{studentId}
+    </select>
+
+    <select id="countByExamAndStudent" resultType="int">
+        SELECT COUNT(*) FROM exam_question_answer WHERE exam_id = #{examId} AND student_id = #{studentId}
+    </select>
+
+    <select id="findByQuestion" resultMap="ExamQuestionAnswerResultMap">
+        SELECT * FROM exam_question_answer WHERE question_id = #{questionId} AND question_type = #{questionType}
+    </select>
+
+    <select id="findPendingSolveByExam" resultMap="ExamQuestionAnswerResultMap">
+        SELECT * FROM exam_question_answer
+        WHERE exam_id = #{examId}
+          AND question_type = 3
+          AND annotation = '待教师批改'
+    </select>
+
+    <select id="sumScoreByExamAndStudent" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(score), 0) FROM exam_question_answer WHERE exam_id = #{examId} AND student_id = #{studentId}
+    </select>
+
+    <delete id="deleteByCourseId">
+        DELETE FROM exam_question_answer WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteByStudentId">
+        DELETE FROM exam_question_answer WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteByPublisherId">
+        DELETE FROM exam_question_answer
+        WHERE exam_id IN (SELECT exam_id FROM (SELECT exam_id FROM exam WHERE publisher_id = #{publisherId}) t)
+    </delete>
+
+    <delete id="deleteByExamAndStudent">
+        DELETE FROM exam_question_answer
+        WHERE exam_id = #{examId} AND student_id = #{studentId}
+    </delete>
+
+</mapper>

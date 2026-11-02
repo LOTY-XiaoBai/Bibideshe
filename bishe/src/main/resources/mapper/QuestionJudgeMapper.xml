@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.QuestionJudgeMapper">
+
+    <resultMap id="QuestionJudgeResultMap" type="com.example.bishe.entity.QuestionJudge">
+        <id column="question_id" property="questionId"/>
+        <result column="content" property="content"/>
+        <result column="answer" property="answer"/>
+        <result column="publisher_id" property="publisherId"/>
+        <result column="is_public" property="isPublic"/>
+        <result column="audit_status" property="auditStatus"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.QuestionJudge"
+            useGeneratedKeys="true" keyProperty="questionId">
+        INSERT INTO question_judge (content, answer, publisher_id, is_public, audit_status)
+        VALUES (#{content}, #{answer}, #{publisherId}, #{isPublic}, #{auditStatus})
+    </insert>
+
+    <select id="findById" resultMap="QuestionJudgeResultMap">
+        SELECT * FROM question_judge WHERE question_id = #{questionId}
+    </select>
+
+    <select id="findByIds" resultMap="QuestionJudgeResultMap">
+        SELECT * FROM question_judge
+        WHERE question_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="findByPublisherId" resultMap="QuestionJudgeResultMap">
+        SELECT * FROM question_judge WHERE publisher_id = #{publisherId} ORDER BY question_id DESC
+    </select>
+
+    <select id="findPublicApproved" resultMap="QuestionJudgeResultMap">
+        SELECT * FROM question_judge WHERE is_public = 1 AND audit_status = 1 ORDER BY question_id DESC
+    </select>
+
+    <select id="findPendingAudit" resultMap="QuestionJudgeResultMap">
+        SELECT * FROM question_judge WHERE is_public = 1 AND audit_status = 0 ORDER BY question_id
+    </select>
+
+    <update id="updateAuditStatus">
+        UPDATE question_judge
+        SET is_public = #{isPublic}, audit_status = #{auditStatus}
+        WHERE question_id = #{questionId}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM question_judge WHERE question_id = #{questionId}
+    </delete>
+
+    <delete id="deleteByPublisherId">
+        DELETE FROM question_judge WHERE publisher_id = #{publisherId}
+    </delete>
+
+</mapper>

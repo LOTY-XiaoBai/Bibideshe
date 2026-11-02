@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.CourseMapper">
+
+    <resultMap id="CourseResultMap" type="com.example.bishe.entity.Course">
+        <id column="course_id" property="courseId"/>
+        <result column="teacher_id" property="teacherId"/>
+        <result column="course_name" property="courseName"/>
+        <result column="is_finished" property="isFinished"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.Course"
+            useGeneratedKeys="true" keyProperty="courseId">
+        INSERT INTO course (teacher_id, course_name, is_finished)
+        VALUES (#{teacherId}, #{courseName}, #{isFinished})
+    </insert>
+
+    <select id="findById" resultMap="CourseResultMap">
+        SELECT * FROM course WHERE course_id = #{courseId}
+    </select>
+
+    <select id="findByIds" resultMap="CourseResultMap">
+        SELECT * FROM course
+        WHERE course_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="findByTeacherId" resultMap="CourseResultMap">
+        SELECT * FROM course WHERE teacher_id = #{teacherId} ORDER BY course_id
+    </select>
+
+    <select id="countByTeacherId" resultType="int">
+        SELECT COUNT(*) FROM course WHERE teacher_id = #{teacherId}
+    </select>
+
+    <select id="countActiveByTeacherId" resultType="int">
+        SELECT COUNT(*) FROM course WHERE teacher_id = #{teacherId} AND is_finished = 0
+    </select>
+
+    <update id="updateFinished">
+        UPDATE course SET is_finished = #{isFinished} WHERE course_id = #{courseId}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM course WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteByTeacherId">
+        DELETE FROM course WHERE teacher_id = #{teacherId}
+    </delete>
+
+    <select id="findForAdmin" resultMap="CourseResultMap">
+        SELECT * FROM course
+        <where>
+            <if test="courseId != null">
+                course_id = #{courseId}
+            </if>
+        </where>
+        ORDER BY course_id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countForAdmin" resultType="int">
+        SELECT COUNT(*) FROM course
+        <where>
+            <if test="courseId != null">
+                course_id = #{courseId}
+            </if>
+        </where>
+    </select>
+
+</mapper>

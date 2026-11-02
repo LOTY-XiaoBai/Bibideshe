@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.CheckInRecordMapper">
+
+    <resultMap id="CheckInRecordResultMap" type="com.example.bishe.entity.CheckInRecord">
+        <id column="check_in_id" property="checkInId"/>
+        <result column="course_id" property="courseId"/>
+        <result column="publisher_id" property="publisherId"/>
+        <result column="publish_time" property="publishTime"/>
+        <result column="deadline" property="deadline"/>
+        <result column="end_time" property="endTime"/>
+        <result column="attendee_count" property="attendeeCount"/>
+        <result column="status" property="status"/>
+        <result column="score_value" property="scoreValue"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.CheckInRecord"
+            useGeneratedKeys="true" keyProperty="checkInId">
+        INSERT INTO check_in_record (course_id, publisher_id, publish_time, deadline,
+                                     end_time, attendee_count, status, score_value)
+        VALUES (#{courseId}, #{publisherId}, #{publishTime}, #{deadline},
+                #{endTime}, #{attendeeCount}, #{status}, #{scoreValue})
+    </insert>
+
+    <select id="findById" resultMap="CheckInRecordResultMap">
+        SELECT * FROM check_in_record WHERE check_in_id = #{checkInId}
+    </select>
+
+    <select id="findByCourseId" resultMap="CheckInRecordResultMap">
+        SELECT * FROM check_in_record
+        WHERE course_id = #{courseId}
+        ORDER BY publish_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByCourseId" resultType="int">
+        SELECT COUNT(*) FROM check_in_record WHERE course_id = #{courseId}
+    </select>
+
+    <update id="endCheckIn">
+        UPDATE check_in_record
+        SET status = 1, end_time = #{endTime}
+        WHERE check_in_id = #{checkInId}
+    </update>
+
+    <update id="updateAttendeeCount">
+        UPDATE check_in_record
+        SET attendee_count = #{count}
+        WHERE check_in_id = #{checkInId}
+    </update>
+
+</mapper>

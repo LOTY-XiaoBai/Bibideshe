@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.CoursePersonnelMapper">
+
+    <resultMap id="CoursePersonnelResultMap" type="com.example.bishe.entity.CoursePersonnel">
+        <id column="course_id" property="courseId"/>
+        <id column="student_id" property="studentId"/>
+        <result column="student_score" property="studentScore"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.CoursePersonnel">
+        INSERT INTO course_personnel (course_id, student_id, student_score)
+        VALUES (#{courseId}, #{studentId}, #{studentScore})
+    </insert>
+
+    <select id="find" resultMap="CoursePersonnelResultMap">
+        SELECT * FROM course_personnel
+        WHERE course_id = #{courseId} AND student_id = #{studentId}
+    </select>
+
+    <select id="findByCourseId" resultMap="CoursePersonnelResultMap">
+        SELECT * FROM course_personnel WHERE course_id = #{courseId}
+    </select>
+
+    <select id="findMembersByCourseId" resultType="com.example.bishe.dto.CourseMemberVO">
+        SELECT
+            cp.course_id AS courseId,
+            cp.student_id AS studentId,
+            s.nickname AS nickname,
+            cp.student_score AS studentScore
+        FROM course_personnel cp
+        LEFT JOIN student s ON cp.student_id = s.student_id
+        WHERE cp.course_id = #{courseId}
+        ORDER BY cp.student_id
+    </select>
+
+    <select id="findByStudentId" resultMap="CoursePersonnelResultMap">
+        SELECT * FROM course_personnel WHERE student_id = #{studentId}
+    </select>
+
+    <delete id="delete">
+        DELETE FROM course_personnel
+        WHERE course_id = #{courseId} AND student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteByCourseId">
+        DELETE FROM course_personnel WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteByStudentId">
+        DELETE FROM course_personnel WHERE student_id = #{studentId}
+    </delete>
+
+    <update id="updateStudentScore">
+        UPDATE course_personnel
+        SET student_score = #{studentScore}
+        WHERE course_id = #{courseId} AND student_id = #{studentId}
+    </update>
+
+    <select id="findFinishedCourseScoresByStudentId" resultMap="CoursePersonnelResultMap">
+        SELECT cp.* FROM course_personnel cp
+        JOIN course c ON cp.course_id = c.course_id
+        WHERE cp.student_id = #{studentId} AND c.is_finished = 1
+    </select>
+
+    <select id="getStudentTotalScore" resultType="com.example.bishe.dto.StudentScoreVO">
+        SELECT
+            s.student_id AS studentId,
+            s.nickname AS nickname,
+            COUNT(c.course_id) AS finishedCourseCount,
+            COALESCE(AVG(CASE WHEN c.is_finished = 1 THEN cp.student_score END), 0) AS totalScore
+        FROM student s
+        LEFT JOIN course_personnel cp ON s.student_id = cp.student_id
+        LEFT JOIN course c ON cp.course_id = c.course_id AND c.is_finished = 1
+        WHERE s.student_id = #{studentId}
+        GROUP BY s.student_id, s.nickname
+    </select>
+
+    <!-- ==================== 学生课程分数聚合查询 ==================== -->
+
+    <!-- 汇总某学生在某课程的全部考试得分 -->
+    <select id="getExamScoreSumByCourseAndStudent" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(uer.exam_score), 0)
+        FROM user_exam_record uer
+        JOIN exam e ON uer.exam_id = e.exam_id
+        WHERE e.course_id = #{courseId} AND uer.student_id = #{studentId}
+    </select>
+
+    <!-- 汇总某课程全部考试的满分总分(所有考试的各题分值之和) -->
+    <select id="getExamMaxScoreSumByCourse" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(t.max_score), 0)
+        FROM (
+            SELECT eq.exam_id, SUM(eq.score) AS max_score
+            FROM exam_question eq
+            JOIN exam e ON eq.exam_id = e.exam_id
+            WHERE e.course_id = #{courseId}
+            GROUP BY eq.exam_id
+        ) t
+    </select>
+
+    <!-- 汇总某学生在某课程的全部作业得分 -->
+    <select id="getHomeworkScoreSumByCourseAndStudent" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(uhr.homework_score), 0)
+        FROM user_homework_record uhr
+        JOIN homework h ON uhr.homework_id = h.homework_id
+        WHERE h.course_id = #{courseId} AND uhr.student_id = #{studentId}
+    </select>
+
+    <!-- 汇总某课程全部作业的满分总分 -->
+    <select id="getHomeworkMaxScoreSumByCourse" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(t.max_score), 0)
+        FROM (
+            SELECT hq.homework_id, SUM(hq.score) AS max_score
+            FROM homework_question hq
+            JOIN homework h ON hq.homework_id = h.homework_id
+            WHERE h.course_id = #{courseId}
+            GROUP BY hq.homework_id
+        ) t
+    </select>
+
+    <!-- 查询某学生在某课程的签到统计(按签到分值加权) -->
+    <select id="getAttendanceStatsByCourseAndStudent" resultType="java.util.HashMap">
+        SELECT
+            COALESCE(SUM(COALESCE(cir.score_value, 1)), 0) AS totalScore,
+            COALESCE(SUM(CASE WHEN ciu.status != 0 THEN COALESCE(cir.score_value, 1) ELSE 0 END), 0) AS earnedScore,
+            COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN ciu.status != 0 THEN 1 ELSE 0 END), 0) AS attended
+        FROM check_in_user ciu
+        JOIN check_in_record cir ON ciu.check_in_id = cir.check_in_id
+        WHERE cir.course_id = #{courseId} AND ciu.student_id = #{studentId}
+    </select>
+
+</mapper>

@@ -1,0 +1,29 @@
+# 私密配置
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# 后端构建与运行时数据
+**/target/
+**/logs/
+**/*.log
+**/uploads/*
+!**/uploads/.gitkeep
+
+# 前端依赖与构建产物
+**/node_modules/
+**/dist/
+**/dist-ssr/
+
+# IDE / OS
+**/.idea/
+**/.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# 旧仓库的本地可恢复备份
+.git-backups/

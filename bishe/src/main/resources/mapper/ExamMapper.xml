@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.ExamMapper">
+
+    <resultMap id="ExamResultMap" type="com.example.bishe.entity.Exam">
+        <id column="exam_id" property="examId"/>
+        <result column="course_id" property="courseId"/>
+        <result column="publisher_id" property="publisherId"/>
+        <result column="time_limit" property="timeLimit"/>
+        <result column="hide_result_until_publish" property="hideResultUntilPublish"/>
+        <result column="is_result_published" property="isResultPublished"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.bishe.entity.Exam"
+            useGeneratedKeys="true" keyProperty="examId">
+        INSERT INTO exam (course_id, publisher_id, time_limit, hide_result_until_publish, is_result_published)
+        VALUES (#{courseId}, #{publisherId}, #{timeLimit}, #{hideResultUntilPublish}, #{isResultPublished})
+    </insert>
+
+    <select id="findById" resultMap="ExamResultMap">
+        SELECT * FROM exam WHERE exam_id = #{examId}
+    </select>
+
+    <select id="findByCourseId" resultMap="ExamResultMap">
+        SELECT * FROM exam WHERE course_id = #{courseId} ORDER BY exam_id DESC
+    </select>
+
+    <select id="findByPublisherId" resultMap="ExamResultMap">
+        SELECT * FROM exam WHERE publisher_id = #{publisherId} ORDER BY exam_id DESC
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM exam WHERE exam_id = #{examId}
+    </delete>
+
+    <delete id="deleteByCourseId">
+        DELETE FROM exam WHERE course_id = #{courseId}
+    </delete>
+
+    <delete id="deleteByPublisherId">
+        DELETE FROM exam WHERE publisher_id = #{publisherId}
+    </delete>
+
+    <update id="updateResultPublished">
+        UPDATE exam SET is_result_published = #{isResultPublished} WHERE exam_id = #{examId}
+    </update>
+
+</mapper>

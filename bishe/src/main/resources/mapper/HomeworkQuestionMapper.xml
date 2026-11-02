@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.bishe.mapper.HomeworkQuestionMapper">
+
+    <resultMap id="HomeworkQuestionResultMap" type="com.example.bishe.entity.HomeworkQuestion">
+        <id column="homework_id" property="homeworkId"/>
+        <id column="question_id" property="questionId"/>
+        <id column="question_type" property="questionType"/>
+        <result column="score" property="score"/>
+    </resultMap>
+
+    <insert id="batchInsert">
+        INSERT INTO homework_question (homework_id, question_id, question_type, score)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.homeworkId}, #{item.questionId}, #{item.questionType}, #{item.score})
+        </foreach>
+    </insert>
+
+    <select id="findByHomeworkId" resultMap="HomeworkQuestionResultMap">
+        SELECT * FROM homework_question WHERE homework_id = #{homeworkId}
+    </select>
+
+    <select id="find" resultMap="HomeworkQuestionResultMap">
+        SELECT * FROM homework_question
+        WHERE homework_id = #{homeworkId} AND question_id = #{questionId} AND question_type = #{questionType}
+    </select>
+
+    <select id="findByQuestion" resultMap="HomeworkQuestionResultMap">
+        SELECT * FROM homework_question WHERE question_id = #{questionId} AND question_type = #{questionType}
+    </select>
+
+    <delete id="deleteByHomeworkId">
+        DELETE FROM homework_question WHERE homework_id = #{homeworkId}
+    </delete>
+
+    <delete id="deleteByCourseId">
+        DELETE FROM homework_question
+        WHERE homework_id IN (SELECT homework_id FROM (SELECT homework_id FROM homework WHERE course_id = #{courseId}) t)
+    </delete>
+
+    <delete id="deleteByPublisherId">
+        DELETE FROM homework_question
+        WHERE homework_id IN (SELECT homework_id FROM (SELECT homework_id FROM homework WHERE publisher_id = #{publisherId}) t)
+    </delete>
+
+</mapper>
