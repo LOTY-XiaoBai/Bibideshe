@@ -46,15 +46,17 @@ public class ShopService {
     private final OrderRecordMapper orderRecordMapper;
     private final OrderEvaluationMapper orderEvaluationMapper;
     private final SocialUserService socialUserService;
+    private final ProfileShopService profileShopService;
 
     public ShopService(AdvertisementMapper advertisementMapper,
                        OrderRecordMapper orderRecordMapper,
                        OrderEvaluationMapper orderEvaluationMapper,
-                       SocialUserService socialUserService) {
+                       SocialUserService socialUserService, ProfileShopService profileShopService) {
         this.advertisementMapper = advertisementMapper;
         this.orderRecordMapper = orderRecordMapper;
         this.orderEvaluationMapper = orderEvaluationMapper;
         this.socialUserService = socialUserService;
+        this.profileShopService = profileShopService;
     }
 
     // ==================== 管理员: 广告/商品 ====================
@@ -127,6 +129,7 @@ public class ShopService {
             throw new BusinessException("广告ID不能为空");
         }
         socialUserService.requireProfile(buyerId);
+        String shipping = profileShopService.shipping(buyerId);
         Advertisement ad = requireActiveAd(request.getAdId());
 
         OrderRecord order = new OrderRecord();
@@ -137,6 +140,7 @@ public class ShopService {
         order.setStatus(STATUS_PENDING);
         order.setAfterSaleStatus(AFTER_SALE_NONE);
         orderRecordMapper.insert(order);
+        profileShopService.snapshot(order.getOrderId(), shipping);
         return toOrderVO(orderRecordMapper.findById(order.getOrderId()));
     }
 
@@ -180,6 +184,7 @@ public class ShopService {
         if (request.getRating() == null || request.getRating() < 1 || request.getRating() > 5) {
             throw new BusinessException("评价星级须为1-5");
         }
+        profileShopService.lockOrder(request.getOrderId());
         OrderRecord order = requireOrder(request.getOrderId());
         if (!buyerId.equals(order.getBuyerId())) {
             throw new BusinessException("无权评价该订单");

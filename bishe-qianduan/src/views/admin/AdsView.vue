@@ -35,6 +35,7 @@
         </el-table-column>
         <el-table-column label="操作" width="160">
           <template #default="{ row }">
+            <RouterLink :to="`/admin/shop/product/${row.adId}`">图文详情</RouterLink>
             <el-button link size="small" :disabled="row.isDeleted === 1" @click="openAdDialog(row)">
               编辑
             </el-button>
@@ -84,6 +85,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="logisticsInfo" label="物流" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="shippingSnapshot" label="收货人 / 电话 / 地址" min-width="240" show-overflow-tooltip />
         <el-table-column label="操作" width="120">
           <template #default="{ row }">
             <el-button link size="small" :disabled="row.status === 2" @click="openLogistics(row)">
@@ -197,6 +199,7 @@ function flattenOrder(item) {
     adId: order.adId,
     buyerId: order.buyerId,
     logisticsInfo: order.logisticsInfo,
+    shippingSnapshot: order.shippingSnapshot,
     status: order.status,
     afterSaleStatus: order.afterSaleStatus,
     createTime: order.createTime,

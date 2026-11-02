@@ -82,6 +82,7 @@ const userStore = useUserStore()
 
 const workMenus = [
   { path: '/teacher/home', label: '主页概览', icon: 'ph ph-chalkboard-teacher' },
+  { path: '/teacher/activity', label: '动态', icon: 'ph ph-newspaper' },
   { path: '/teacher/courses', label: '我的授课', icon: 'ph ph-books' },
   { path: '/teacher/chat', label: '交际与答疑', icon: 'ph ph-chats' },
 ]

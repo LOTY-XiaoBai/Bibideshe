@@ -14,11 +14,13 @@
         </div>
       </article>
     </div>
+    <CommunityFeed compact />
   </div>
 </template>
 
 <script setup>
 import { useRouter } from 'vue-router'
+import CommunityFeed from '@/components/CommunityFeed.vue'
 
 const router = useRouter()
 

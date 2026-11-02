@@ -68,10 +68,12 @@
         </div>
       </section>
     </div>
+    <ExtraProfile />
   </div>
 </template>
 
 <script setup>
+import ExtraProfile from '@/components/ExtraProfile.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'

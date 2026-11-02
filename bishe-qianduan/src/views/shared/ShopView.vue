@@ -159,6 +159,7 @@
         <p><strong>商品：</strong>{{ currentOrder.advertisement?.title || currentOrder.order?.adId }}</p>
         <p><strong>状态：</strong>{{ statusLabel(currentOrder.order?.status) }}</p>
         <p><strong>物流：</strong>{{ currentOrder.order?.logisticsInfo || '暂无' }}</p>
+        <p><strong>收货地址：</strong>{{ currentOrder.order?.shippingSnapshot || '历史订单未记录地址' }}</p>
         <p><strong>下单时间：</strong>{{ formatTime(currentOrder.order?.createTime) }}</p>
         <p v-if="currentOrder.order?.afterSaleContent">
           <strong>售后申请：</strong>{{ currentOrder.order.afterSaleContent }}
@@ -220,6 +221,9 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
+import { getRole } from '@/utils/auth'
+const router = useRouter()
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { resolveMediaUrl } from '@/utils/media'
@@ -319,13 +323,7 @@ function switchToOrders() {
 }
 
 async function openDetail(ad) {
-  try {
-    const res = await fetchAdDetail(ad.adId)
-    currentAd.value = res.data || ad
-  } catch {
-    currentAd.value = ad
-  }
-  showDetail.value = true
+  router.push(`/${getRole().toLowerCase()}/shop/product/${ad.adId}`)
 }
 
 async function doBuy(adId) {
@@ -344,14 +342,7 @@ async function doBuy(adId) {
 }
 
 async function quickBuy(ad) {
-  try {
-    await ElMessageBox.confirm(`确认购买「${ad.title || ad.adId}」？`, '确认下单', {
-      type: 'info',
-    })
-    await doBuy(ad.adId)
-  } catch {
-    // cancel
-  }
+  await openDetail(ad)
 }
 
 async function openOrderDetail(item) {

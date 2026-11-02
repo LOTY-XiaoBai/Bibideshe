@@ -208,7 +208,7 @@
                     class="bubble-img"
                     @click="previewImage(m.content)"
                   />
-                  <p v-else class="bubble-text">{{ m.content }}</p>
+                  <div v-else class="bubble-text">{{ m.content }}<RouterLink v-if="postLink(m.content)" :to="postLink(m.content)">打开社区帖子 →</RouterLink></div>
                 </template>
               </div>
               <div class="msg-meta">
@@ -451,6 +451,10 @@
 </template>
 
 <script setup>
+function postLink(content) {
+  const last = String(content || '').split('\n').pop()
+  return /^\/community\/post\/\d+$/.test(last) ? last : ''
+}
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'

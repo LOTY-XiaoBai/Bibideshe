@@ -67,10 +67,12 @@
         </el-table>
       </section>
     </div>
+    <ExtraProfile />
   </div>
 </template>
 
 <script setup>
+import ExtraProfile from '@/components/ExtraProfile.vue'
 import { onMounted, reactive, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'

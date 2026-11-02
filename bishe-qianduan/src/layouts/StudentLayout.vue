@@ -91,6 +91,7 @@ const showAd = computed(() => route.path === '/student/home')
 
 const mainMenus = [
   { path: '/student/home', label: '系统首页', icon: 'ph ph-squares-four' },
+  { path: '/student/activity', label: '动态', icon: 'ph ph-newspaper' },
   { path: '/student/courses', label: '我的课程', icon: 'ph ph-books' },
   { path: '/student/chat', label: '消息沟通', icon: 'ph ph-chats' },
 ]

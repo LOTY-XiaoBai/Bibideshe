@@ -33,11 +33,13 @@
         </div>
       </RouterLink>
     </div>
+    <CommunityFeed compact />
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import CommunityFeed from '@/components/CommunityFeed.vue'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()

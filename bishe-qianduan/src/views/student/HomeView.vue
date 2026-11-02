@@ -19,11 +19,13 @@
         </div>
       </RouterLink>
     </div>
+    <CommunityFeed compact />
   </div>
 </template>
 
 <script setup>
 import { useUserStore } from '@/stores/user'
+import CommunityFeed from '@/components/CommunityFeed.vue'
 
 const userStore = useUserStore()
 

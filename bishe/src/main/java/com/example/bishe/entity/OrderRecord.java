@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 public class OrderRecord {
 
     private Long orderId;
+    private String shippingSnapshot;
+    private LocalDateTime receivedTime;
 
     private Long adId;
 

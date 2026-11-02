@@ -38,7 +38,7 @@ public interface OrderRecordMapper {
     @Update("UPDATE order_record SET logistics_info = #{logisticsInfo}, status = 1 WHERE order_id = #{orderId}")
     int updateLogistics(@Param("orderId") Long orderId, @Param("logisticsInfo") String logisticsInfo);
 
-    @Update("UPDATE order_record SET is_received = 1, status = 2 WHERE order_id = #{orderId}")
+    @Update("UPDATE order_record SET is_received = 1, status = 2, received_time=NOW() WHERE order_id = #{orderId} AND status=1")
     int confirmReceived(Long orderId);
 
     @Update("UPDATE order_record SET after_sale_content = #{content}, after_sale_status = 1, " +

@@ -61,6 +61,7 @@ let pollTimer = null
 
 const menus = [
   { path: '/admin/home', label: '管理首页', icon: 'ph ph-squares-four' },
+  { path: '/admin/activity', label: '动态', icon: 'ph ph-newspaper' },
   { path: '/admin/accounts', label: '账号管理', icon: 'ph ph-user-minus' },
   { path: '/admin/courses', label: '课程管理', icon: 'ph ph-books' },
   { path: '/admin/ads', label: '广告与订单', icon: 'ph ph-megaphone' },
