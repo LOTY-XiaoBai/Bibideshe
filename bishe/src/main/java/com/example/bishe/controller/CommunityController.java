@@ -15,8 +15,9 @@ public class CommunityController {
  @PostMapping("/posts/{id}/action") public Result<?> action(@PathVariable long id,@RequestBody Map<String,String>b){service.action(id,b.getOrDefault("action",""));return Result.success(null);}
  @PostMapping("/posts/{id}/replies") public Result<?> reply(@PathVariable long id,@RequestBody Map<String,Object>b){service.reply(id,b);return Result.success(null);}
  @DeleteMapping("/replies/{id}") public Result<?> deleteReply(@PathVariable long id){service.deleteReply(id);return Result.success(null);}
+ @PostMapping("/replies/{id}/like") public Result<?> likeReply(@PathVariable long id){service.likeReply(id);return Result.success(null);}
  @PostMapping("/posts/{id}/share") public Result<?> share(@PathVariable long id,@RequestBody Map<String,Object>b){service.share(id,b);return Result.success(null);}
- @GetMapping("/notices") public Result<?> notices(@RequestParam(defaultValue="1")int page){return Result.success(service.notices(page));}
+ @GetMapping("/notices") public Result<?> notices(@RequestParam(defaultValue="1")int page){return Result.success(service.noticePage(page));}
  @PostMapping("/notices/read") public Result<?> read(){service.readNotices();return Result.success(null);}
  @GetMapping("/words") public Result<?> words(){return Result.success(service.wordList());}
  @PostMapping("/words") public Result<?> addWord(@RequestBody Map<String,Object>b){service.addWord(b);return Result.success(null);}

@@ -5,7 +5,7 @@ import { ROLES, roleHomePath } from "@/utils/role";
 const routes = [
   {
     path: "/community/post/:id",
-    component: () => import("@/components/CommunityFeed.vue"),
+    component: () => import("@/views/shared/PostDetailView.vue"),
     meta: { requiresAuth: true },
   },
   {

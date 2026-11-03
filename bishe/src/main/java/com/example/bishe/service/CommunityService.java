@@ -25,12 +25,16 @@ public class CommunityService {
         if(s.length()>max) throw new BusinessException(k+" 内容过长"); return s;
     }
     public String blocks(Map<String,Object> b) {
+        return blocks(b, false);
+    }
+    private String blocks(Map<String,Object> b, boolean allowEmpty) {
         String s=text(b,"blocks",50000);
+        if(allowEmpty && s.isBlank()) s="[]";
         if(s.isBlank()) throw new BusinessException("请填写图文内容");
         // JSON 必须由服务端解析验证；仅支持纯文字与站内图片，不接受 HTML。
         try {
             var list=new tools.jackson.databind.json.JsonMapper().readValue(s,List.class);
-            if(list.isEmpty() || list.size()>60) throw new IllegalArgumentException();
+            if((!allowEmpty && list.isEmpty()) || list.size()>60) throw new IllegalArgumentException();
             for(Object item:list) {
                 if(!(item instanceof Map m)) throw new IllegalArgumentException();
                 String type=String.valueOf(m.get("type")), value=String.valueOf(m.get("value"));
@@ -39,6 +43,16 @@ public class CommunityService {
             }
         } catch(Exception e) { throw new BusinessException("图文格式错误，只允许文字和本站上传图片"); }
         return s;
+    }
+    private void enrichAuthors(List<Map<String,Object>> rows) {
+        if(rows.isEmpty()) return;
+        Set<String> owners=new HashSet<>(); for(var r:rows) owners.add(r.get("owner").toString());
+        String placeholders=String.join(",",Collections.nCopies(owners.size(),"?"));
+        String sql="SELECT CONCAT('STUDENT:',student_id) owner,nickname display_name,avatar FROM student WHERE CONCAT('STUDENT:',student_id) IN ("+placeholders+") UNION ALL SELECT CONCAT('TEACHER:',teacher_id) owner,name display_name,avatar FROM teacher WHERE CONCAT('TEACHER:',teacher_id) IN ("+placeholders+")";
+        List<Object> args=new ArrayList<>(owners); args.addAll(owners);
+        Map<String,Map<String,Object>> profiles=new HashMap<>();
+        for(var p:db.queryForList(sql,args.toArray()))profiles.put(p.get("owner").toString(),p);
+        for(var r:rows){String key=r.get("owner").toString();var p=profiles.get(key);r.put("author_id",key.substring(key.indexOf(':')+1));r.put("avatar",p==null?"":Objects.toString(p.get("avatar"),""));r.put("display_name",p==null?r.get("author"):p.get("display_name"));}
     }
     private Map<String,Object> post(long id,boolean lock) {
         var rows=db.queryForList("SELECT * FROM community_post WHERE id=?"+(lock?" FOR UPDATE":""),id);
@@ -67,7 +81,9 @@ public class CommunityService {
         Long total=db.queryForObject("SELECT COUNT(*) FROM community_post p"+where,Long.class,args.toArray());
         String order=sort.equals("hot")?"views DESC,p.created_at DESC":"p.created_at DESC";
         args.add((page-1)*20);
-        var list=db.queryForList("SELECT p.*, (SELECT COUNT(*) FROM community_view v WHERE v.post_id=p.id) views, (SELECT COUNT(*) FROM community_like l WHERE l.post_id=p.id) likes FROM community_post p"+where+" ORDER BY p.pinned DESC,"+order+" LIMIT 20 OFFSET ?",args.toArray());
+        args.add(0,owner());
+        var list=db.queryForList("SELECT p.*, (SELECT COUNT(*) FROM community_view v WHERE v.post_id=p.id) views, (SELECT COUNT(*) FROM community_like l WHERE l.post_id=p.id) likes, (SELECT COUNT(*) FROM community_reply r WHERE r.post_id=p.id AND r.deleted=0) reply_count, EXISTS(SELECT 1 FROM community_like l WHERE l.post_id=p.id AND l.owner=?) liked FROM community_post p"+where+" ORDER BY p.pinned DESC,"+order+" LIMIT 20 OFFSET ?",args.toArray());
+        enrichAuthors(list);
         return Map.of("list",list,"total",total,"page",page,"owner",owner(),"moderation",moderation());
     }
     public Map<String,Object> moderation() {
@@ -76,8 +92,9 @@ public class CommunityService {
     }
     @Transactional
     public long save(Long id,Map<String,Object> b) {
-        writable(); String title=text(b,"title",120), blocks=blocks(b);
+        writable(); String title=text(b,"title",120);
         if(title.isBlank()) throw new BusinessException("标题不能为空");
+        String blocks=blocks(b,true);
         String plain=plain(blocks);
         if(!mask(title+plain).equals(title+plain)) throw new BusinessException("内有不良内容，无法发布");
         if(id==null) {
@@ -99,7 +116,11 @@ public class CommunityService {
     public Map<String,Object> detail(long id) {
         var p=post(id,false); accessible(p);
         if("PUBLIC".equals(p.get("status"))) db.update("INSERT IGNORE INTO community_view(post_id,owner,view_day) VALUES(?,?,CURRENT_DATE)",id,owner());
-        p.put("replies",db.queryForList("SELECT * FROM community_reply WHERE post_id=? AND deleted=0 ORDER BY id LIMIT 500",id));
+        var replies=db.queryForList("SELECT r.*, (SELECT COUNT(*) FROM community_reply_like l WHERE l.reply_id=r.id) likes, EXISTS(SELECT 1 FROM community_reply_like l WHERE l.reply_id=r.id AND l.owner=?) liked FROM community_reply r WHERE post_id=? ORDER BY id LIMIT 500",owner(),id);
+        for(var r:replies)if(Boolean.TRUE.equals(r.get("deleted")) || "1".equals(String.valueOf(r.get("deleted"))))r.put("content","该回复已删除");
+        enrichAuthors(replies); enrichAuthors(List.of(p));
+        p.put("replies",replies);
+        p.put("reply_count",db.queryForObject("SELECT COUNT(*) FROM community_reply WHERE post_id=? AND deleted=0",Long.class,id));
         p.put("likes",db.queryForObject("SELECT COUNT(*) FROM community_like WHERE post_id=?",Long.class,id));
         p.put("views",db.queryForObject("SELECT COUNT(*) FROM community_view WHERE post_id=?",Long.class,id));
         p.put("liked",db.queryForObject("SELECT COUNT(*) FROM community_like WHERE post_id=? AND owner=?",Long.class,id,owner())>0);
@@ -159,6 +180,18 @@ public class CommunityService {
         if(!admin() && !owner().equals(r.get("owner")) && !owner().equals(p.get("owner"))) throw new BusinessException(403,"无权删除回复");
         if(db.update("UPDATE community_reply SET deleted=1 WHERE id=? AND deleted=0",id)>0) notice(r.get("owner").toString(),pid,"REPLY_DELETED","你的回复已被删除");
     }
+    @Transactional
+    public void likeReply(long id) {
+        var rows=db.queryForList("SELECT * FROM community_reply WHERE id=? AND deleted=0 FOR UPDATE",id);
+        if(rows.isEmpty())throw new BusinessException(404,"回复不存在");var r=rows.get(0);long pid=((Number)r.get("post_id")).longValue();
+        if(!"PUBLIC".equals(post(pid,false).get("status")))throw new BusinessException("帖子已下架");
+        if(db.update("DELETE FROM community_reply_like WHERE reply_id=? AND owner=?",id,owner())==0){db.update("INSERT INTO community_reply_like(reply_id,owner) VALUES(?,?)",id,owner());if(!owner().equals(r.get("owner")))notice(r.get("owner").toString(),pid,"REPLY_LIKE",author()+"点赞了你的回复");}
+    }
+    public Map<String,Object> noticePage(int page) {
+        int offset=(Math.max(1,Math.min(100000,page))-1)*30;
+        var rows=db.queryForList("SELECT * FROM community_notice WHERE owner=? ORDER BY id DESC LIMIT 31 OFFSET ?",owner(),offset);
+        return Map.of("list",rows.subList(0,Math.min(30,rows.size())),"hasMore",rows.size()>30);
+    }
     public List<Map<String,Object>> notices(int page) {return db.queryForList("SELECT * FROM community_notice WHERE owner=? ORDER BY id DESC LIMIT 30 OFFSET ?",owner(),(Math.max(1,page)-1)*30);}
     public void readNotices(){db.update("UPDATE community_notice SET is_read=1 WHERE owner=?",owner());}
     public List<Map<String,Object>> wordList(){AuthContext.requireAdmin();return db.queryForList("SELECT * FROM community_word ORDER BY id DESC");}
@@ -172,5 +205,6 @@ public class CommunityService {
         ChatSendRequest req=new ChatSendRequest(); req.setContent("[社区帖子] "+p.get("title")+"\n/community/post/"+id);req.setMessageType(0);
         try {if(b.get("groupId")!=null){req.setGroupId(Long.valueOf(b.get("groupId").toString()));chat.sendGroup(AuthContext.requireUserId(),req);}else{req.setReceiverId(Long.valueOf(b.get("receiverId").toString()));chat.sendPrivate(AuthContext.requireUserId(),req);}}
         catch(NumberFormatException|NullPointerException e){throw new BusinessException("请选择有效会话");}
+        db.update("UPDATE community_post SET share_count=share_count+1 WHERE id=?",id);
     }
 }

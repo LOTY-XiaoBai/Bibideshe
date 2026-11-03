@@ -33,6 +33,31 @@ class CommunityIntegrationTests {
   assertThatThrownBy(()->service.save(null,body("测试违禁词"))).isInstanceOf(BusinessException.class).hasMessageContaining("不良内容");
   assertThatThrownBy(()->service.save(null,Map.of("title","图片","blocks","[{\"type\":\"image\",\"value\":\"javascript:alert(1)\"}]"))).isInstanceOf(BusinessException.class);
  }
+ @Test void titleIsRequiredButBodyIsOptional(){
+  long id=service.save(null,Map.of("title","只有标题也可以发布","blocks","[]"));
+  assertThat(service.detail(id).get("blocks")).isEqualTo("[]");
+  assertThat(service.detail(id).get("author_id")).isEqualTo(subject);
+  assertThatThrownBy(()->service.save(null,Map.of("title"," ","blocks","[]"))).isInstanceOf(BusinessException.class).hasMessageContaining("标题");
+ }
+ @Test void replyLikesToggleAndDeletedParentDoesNotExposeOriginalContent(){
+  long id=service.save(null,body("回复点赞与楼中楼"));service.reply(id,Map.of("content","原回复正文"));
+  var first=(Map<String,Object>)((List<?>)service.detail(id).get("replies")).get(0);long rid=((Number)first.get("id")).longValue();
+  service.reply(id,Map.of("content","楼中楼内容","parentId",rid));
+  service.likeReply(rid);service.likeReply(rid);assertThat(db.queryForObject("SELECT COUNT(*) FROM community_reply_like WHERE reply_id=?",Long.class,rid)).isZero();
+  service.likeReply(rid);var liked=(Map<String,Object>)((List<?>)service.detail(id).get("replies")).get(0);assertThat(((Number)liked.get("likes")).longValue()).isEqualTo(1L);
+  service.deleteReply(rid);var deleted=(Map<String,Object>)((List<?>)service.detail(id).get("replies")).get(0);assertThat(deleted.get("content")).isEqualTo("该回复已删除");
+  assertThatThrownBy(()->service.likeReply(rid)).isInstanceOf(BusinessException.class);
+ }
+ @Test void notificationHasMoreIsExact(){
+  assertThat(service.noticePage(1).get("hasMore")).isEqualTo(false);
+  for(int i=0;i<30;i++)db.update("INSERT INTO community_notice(owner,kind,message) VALUES(?,'LIKE','测试通知')",CommunityService.owner());
+  assertThat(service.noticePage(1).get("hasMore")).isEqualTo(false);
+  db.update("INSERT INTO community_notice(owner,kind,message) VALUES(?,'LIKE','第31条通知')",CommunityService.owner());
+  assertThat(service.noticePage(1).get("hasMore")).isEqualTo(true);
+  assertThat((List<?>)service.noticePage(1).get("list")).hasSize(30);
+  assertThat((List<?>)service.noticePage(2).get("list")).hasSize(1);
+  assertThat(service.noticePage(2).get("hasMore")).isEqualTo(false);
+ }
  @Test void feedSupportsSearchFeaturedAndMine(){
   String title="检索"+UUID.randomUUID();long id=service.save(null,body(title));
   service.action(id,"feature");service.action(id,"pin");
