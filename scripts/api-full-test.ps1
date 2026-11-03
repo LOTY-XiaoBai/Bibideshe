@@ -173,7 +173,7 @@ $capOk = Assert-Api "GET /api/captcha" {
 }
 
 if (-not $capOk) {
-    Write-Host "Captcha probe failed. See DOCKER_DEPLOY.md" -ForegroundColor Yellow
+    Write-Host "Captcha probe failed. See C:\Users\30881\Desktop\毕设文档\DOCKER_DEPLOY.md" -ForegroundColor Yellow
     exit 1
 }
 
@@ -892,7 +892,7 @@ Write-Host "  Exam/HW/CI: $examId / $homeworkId / $checkInId"
 Write-Host "  Ad/Order/Group: $adId / $orderId / $groupId"
 Write-Host ""
 Write-Host "Frontend/API entry: $FrontUrl   (Swagger is disabled by default)"
-Write-Host "Features: E:\bibideshe\FEATURES.md"
+Write-Host "Features: C:\Users\30881\Desktop\毕设文档\FEATURES.md"
 
 if ($script:FailCount -gt 0) {
     Write-Host ""
