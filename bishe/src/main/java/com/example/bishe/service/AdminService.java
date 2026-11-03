@@ -45,6 +45,7 @@ public class AdminService {
     private static final int MAX_ID_RETRY = 20;
 
     private final AdminMapper adminMapper;
+    private final AdminOperationService operations;
     private final PasswordEncoder passwordEncoder;
     private final CourseService courseService;
     private final CourseMapper courseMapper;
@@ -70,7 +71,8 @@ public class AdminService {
                         ExamService examService,
                         HomeworkService homeworkService,
                         CaptchaService captchaService,
-                        LoginGuardService loginGuardService) {
+                        LoginGuardService loginGuardService, AdminOperationService operations) {
+        this.operations=operations;
         this.adminMapper = adminMapper;
         this.passwordEncoder = passwordEncoder;
         this.courseService = courseService;
@@ -109,6 +111,7 @@ public class AdminService {
      * 由已登录管理员创建新管理员账号。
      * ID 由后端生成("admin" + 5位随机数字), 返回创建成功的管理员信息(不含密码)。
      */
+    @Transactional
     public Admin createAdmin(AdminRegisterRequest request) {
         PasswordPolicy.validate(request.getPassword());
 
@@ -118,6 +121,7 @@ public class AdminService {
 
         adminMapper.insert(admin);
 
+        operations.record("创建管理员","USER",admin.getAdminId(),"ADMIN:"+admin.getAdminId(),null,"","创建管理员账号");
         admin.setPassword(null);
         return admin;
     }
@@ -149,6 +153,7 @@ public class AdminService {
             loginGuardService.onPasswordWrong(accountId);
         }
         loginGuardService.onLoginSuccess(accountId);
+        operations.record("创建管理员","USER",admin.getAdminId(),"ADMIN:"+admin.getAdminId(),null,"","创建管理员账号");
         admin.setPassword(null);
         AuthUser authUser = new AuthUser(null, admin.getAdminId(), UserRole.ADMIN);
         String token = TokenUtil.createToken(authUser);
@@ -165,6 +170,7 @@ public class AdminService {
     /**
      * 管理员审核教师提交至公共题库的题目。
      */
+    @Transactional
     public void auditQuestion(QuestionAuditRequest request) {
         if (request.getQuestionId() == null || request.getQuestionType() == null) {
             throw new BusinessException("题目ID与题目类型不能为空");
@@ -173,17 +179,20 @@ public class AdminService {
             throw new BusinessException("请指明是否通过审核");
         }
         questionService.auditQuestion(request.getQuestionId(), request.getQuestionType(), request.getApprove());
+        operations.record(request.getApprove()?"通过题库审核":"驳回题库审核","QUESTION",request.getQuestionId(),"",null,"","题目类型："+request.getQuestionType());
     }
 
     /**
      * 管理员删除题目(无论是否已上传至公共题库均可删除)。
      * 已经引用该题目的考试/作业会将其替换为占位文案, 并给已作答学生直接补满该题满分。
      */
+    @Transactional
     public void deleteQuestion(QuestionDeleteRequest request) {
         if (request.getQuestionId() == null || request.getQuestionType() == null) {
             throw new BusinessException("题目ID与题目类型不能为空");
         }
         questionService.deleteQuestion(request.getQuestionId(), request.getQuestionType());
+        operations.record("删除题目","QUESTION",request.getQuestionId(),"",null,"","题目类型："+request.getQuestionType());
     }
 
     /**
@@ -320,6 +329,7 @@ public class AdminService {
         }
         courseService.deleteCourseCascade(courseId);
         teacherMapper.decrementCourseCount(course.getTeacherId());
+        operations.record("删除课程","COURSE",courseId,"TEACHER:"+course.getTeacherId(),null,"","课程："+course.getCourseName());
     }
 
     /**
@@ -347,6 +357,7 @@ public class AdminService {
         } else {
             throw new BusinessException("不支持的账号类型: " + type);
         }
+        operations.record("注销账号","USER",request.getAccountId(),type.toUpperCase()+":"+request.getAccountId(),null,"","解绑账号关联数据");
     }
 
     /**

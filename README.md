@@ -1,71 +1,81 @@
-# 毕业设计项目
+# 校园教学与社区系统
 
-本次商城、个人资料、社区更新与商家邀请制设计见 [本次更新说明与商家邀请制方案](本次更新说明与商家邀请制方案.md)。
+项目包含 Spring Boot 后端（`bishe/`）和 Vue 前端（`bishe-qianduan/`）。本文件是当前运行说明。更新记录、功能说明和排错文档统一放在 `C:\Users\30881\Desktop\毕设文档`，旧版模板 README 已删除。
 
-这是一个前后端同仓库（monorepo）项目：
+## 克隆后启动：不需要 Navicat，不需要手工导入 SQL
 
-- `bishe/`：Spring Boot + MyBatis 后端
-- `bishe-qianduan/`：Vue 3 + Vite 前端
-- `docker-compose.yml`：MySQL、Redis、前后端容器编排
-- `scripts/`：接口测试脚本
-- `bishe/docker/mysql/init/01_schema.sql`：数据库建表脚本
+先安装并启动 Docker Desktop（Linux/macOS 使用 Docker Engine 和 Compose），在项目根目录执行：
 
-## 本机开发环境
+```powershell
+# Windows：也可以双击“启动演示.cmd”
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
+```
 
-建议使用 Java 17 LTS、Node.js 20+、MySQL 8 和 Redis。不要用系统当前的 Java 8 启动后端。
+```sh
+# Linux / macOS
+sh scripts/start-demo.sh
+```
 
-1. 复制环境变量示例并填入本机真实值：
+首次构建需要下载镜像和依赖。启动后访问 `http://localhost:8088`，注册自己的账号；管理员通过登录页的首次初始化入口创建。
+
+启动脚本自动生成被 Git 忽略的 `.env.demo`，其中数据库密码、Redis 密码和 Token 密钥均为随机值；已有配置会保留。使用独立的 `bishe-demo` Docker 项目和数据卷，不连接原作者本机 MySQL，不附带真实用户、聊天、帖子、订单，也没有公用默认账号密码。
+
+停止运行并保留数据：
+
+```sh
+docker compose --env-file .env.demo --project-name bishe-demo down
+```
+
+不要额外加 `-v`，该参数会删除演示数据库等数据卷。
+
+## 项目里保留的 7 个 SQL 都参与自动启动
+
+它们是程序运行所需的建表/迁移代码，**不是数据库数据备份，需要提交到 Git**。
+
+| 文件 | 实际用途 |
+| --- | --- |
+| `bishe/docker/mysql/init/01_schema.sql` | 创建基础业务表；Docker 初始化 MySQL 时读取，后端也会检查应用 |
+| `bishe/sql/07_community_shop_profile_manual.sql` | 创建社区、扩展资料、商品详情等结构，补齐订单字段 |
+| `bishe/sql/09_community_reply_likes.sql` | 回复点赞和帖子转发计数字段 |
+| `bishe/sql/10_community_safety.sql` | 个人屏蔽和举报审核结构 |
+| `bishe/sql/11_community_management.sql` | 管理操作日志、好友建立时间和词库合并 |
+| `bishe/sql/12_navigation_appeals.sql` | 警告衰减、申诉和聊天已读游标 |
+| `bishe/sql/13_direct_moderation_appeals.sql` | 管理员直接处置帖子的申诉支持 |
+
+`07` 文件名里的 `manual` 是历史命名，现在也由程序自动执行；保留原文件名是为了兼容已经记录的迁移版本。编号有间隔正常，已经合并或被替代的旧脚本已清理，不需要补回。
+
+后端的 `DatabaseInitializer` 按顺序执行这些文件，并通过 `app_schema_migration` 记录已完成版本，后续启动不重复执行。Maven 将 SQL 打包进后端，Docker 构建也会带上它们。不能把这 7 个文件当成无用备份删除，否则首次部署或数据库升级会失败。
+
+Navicat 只是连接 MySQL 的客户端，界面里看到的是 MySQL 中实际保存的表和数据。项目 SQL 是创建或升级这些表的指令，与 Navicat 不自动同步。当前受控 SQL 只含表结构、通用预置词和迁移逻辑，不含原作者的业务数据。
+
+已清理未使用的旧 SQL、根目录 Navicat 导出和项目内历史 SQL 备份。本机 `.env`、`.env.demo`、日志、上传文件和数据库导出不应提交；忽略规则不能清除历史上已经提交的内容，提交前仍需检查暂存区。
+
+## 本机开发
+
+需要 Java 17+、Node.js 20+、MySQL 8 和 Redis。
+
+1. 在项目根目录将 `.env.example` 复制为 `.env`，填写自己的数据库、Redis 和密钥配置。已有 `.env` 不要覆盖。
+2. 在 MySQL 中创建配置所指向的空数据库，授予应用账号建表和结构升级权限。后端会自动初始化；已有数据库保留数据并按版本升级。
+3. Windows 本机 Redis 可双击“启动Redis.cmd”。默认安装位置由 `scripts/start-redis.ps1` 的 `RedisDirectory` 参数指定，连接配置读取 `.env`。
+4. 使用 Java 17+ 启动后端：
 
    ```powershell
-   Copy-Item .env.example .env
-   ```
-
-   `.env` 已被 Git 忽略，不要将密码或 `TOKEN_SECRET` 提交到仓库。
-
-2. 确保 Navicat 中的 `bishe` 数据库已经存在。建议为应用创建独立的 `bishe_app` 账号，不要让后端长期使用 MySQL `root`。
-
-3. 启动本机 Redis：
-
-   ```powershell
-   Set-Location D:\Redis-123\Redis
-   .\redis-server.exe redis.conf
-   ```
-
-4. 启动后端：
-
-   ```powershell
-   Set-Location E:\bibideshe\bishe
+   cd bishe
    .\mvnw.cmd spring-boot:run
    ```
 
-   默认地址是 `http://localhost:8080`。
-
-5. 启动前端：
+5. 在另一个终端启动前端：
 
    ```powershell
-   Set-Location E:\bibideshe\bishe-qianduan
+   cd bishe-qianduan
    npm install
    npm run dev
    ```
 
-   默认地址是 `http://localhost:5173`。
+本机开发默认前端 `http://localhost:5173`，后端 `http://localhost:8080`。
 
-## 验证命令
+## 检查命令
 
-```powershell
-# 后端编译/测试
-Set-Location E:\bibideshe\bishe
-.\mvnw.cmd test
+后端测试在 `bishe/` 下运行 `.\mvnw.cmd test`，前端构建在 `bishe-qianduan/` 下运行 `npm run build`。数据库集成测试需显式设置 `RUN_DB_INTEGRATION=true`；空库初始化测试另需 `RUN_SCHEMA_INTEGRATION=true`，测试账号必须有创建临时数据库的权限。
 
-# 前端生产构建
-Set-Location E:\bibideshe\bishe-qianduan
-npm run build
-```
-
-## GitHub 提交原则
-
-- 在 `E:\bibideshe` 根目录执行 Git 命令，不要再分别管理前后端。
-- 提交前先执行 `git status`，确认没有 `.env`、日志、上传文件、`node_modules` 或 `target`。
-- 功能完成后使用有意义的提交信息，例如 `fix: load local environment configuration`。
-
-更多部署说明见 `DOCKER_DEPLOY.md`，功能列表见 `FEATURES.md` 和 `项目功能介绍.md`。
+Git 操作统一在仓库根目录执行。不要提交真实配置、用户上传文件、构建目录和数据库备份。

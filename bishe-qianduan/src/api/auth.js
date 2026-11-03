@@ -50,6 +50,9 @@ export function updateTeacherProfile(data) {
   return request.put('/api/teacher/profile', data)
 }
 
-export function revokeCurrentToken() {
-  return request.post('/api/auth/logout')
+export function revokeCurrentToken(token) {
+  return request.post('/api/auth/logout', null, {
+    headers: { Authorization: `Bearer ${token}` },
+    silent: true,
+  })
 }

@@ -37,15 +37,17 @@ public class GroupService {
     private final GroupUserMapper groupUserMapper;
     private final GroupAdminMapper groupAdminMapper;
     private final SocialUserService socialUserService;
+    private final AdminOperationService operations;
 
     public GroupService(GroupChatMapper groupChatMapper,
                         GroupUserMapper groupUserMapper,
                         GroupAdminMapper groupAdminMapper,
-                        SocialUserService socialUserService) {
+                        SocialUserService socialUserService,AdminOperationService operations) {
         this.groupChatMapper = groupChatMapper;
         this.groupUserMapper = groupUserMapper;
         this.groupAdminMapper = groupAdminMapper;
         this.socialUserService = socialUserService;
+        this.operations=operations;
     }
 
     @Transactional
@@ -114,6 +116,7 @@ public class GroupService {
             throw new BusinessException("该群聊已被软删除");
         }
         groupChatMapper.softDelete(groupId);
+        operations.record("软删除群聊","GROUP",groupId,"",null,"",group.getGroupName());
     }
 
     /**
@@ -129,6 +132,7 @@ public class GroupService {
             throw new BusinessException("封禁理由不能为空");
         }
         groupChatMapper.ban(groupId, banReason.trim(), adminId, java.time.LocalDateTime.now());
+        operations.record("封禁群聊","GROUP",groupId,"",null,"",group.getGroupName()+"；"+banReason);
     }
 
     /**
@@ -141,6 +145,7 @@ public class GroupService {
             throw new BusinessException("该群聊未被封禁");
         }
         groupChatMapper.unban(groupId);
+        operations.record("解封群聊","GROUP",groupId,"",null,"",group.getGroupName());
     }
 
     /**

@@ -6,11 +6,20 @@
       ><span>帖子详情</span><span class="top-brand">校园社区</span>
     </header>
     <div v-if="post" class="detail-inner">
-      <CommunityAuthor :person="post" :views="post.views"
-        ><span v-if="post.status === 'HIDDEN'" class="visibility"
-          ><i aria-hidden="true" class="ph ph-lock-simple" />仅自己可见</span
-        ></CommunityAuthor
-      >
+      <div class="author-toolbar">
+        <CommunityAuthor :person="post" :views="post.views"
+          ><span v-if="post.status === 'HIDDEN'" class="visibility"
+            ><i aria-hidden="true" class="ph ph-lock-simple" />仅自己可见</span
+          ></CommunityAuthor
+        ><PostSafety
+          v-if="active && !admin"
+          :post="post"
+          :viewer="post.viewer"
+          show-follow
+          @blocked="back"
+          @friend-requested="post.friend_status = 'REQUEST_SENT'"
+        />
+      </div>
       <h1>
         <span v-if="flag(post.pinned)" class="tag">置顶</span
         ><span v-if="flag(post.featured)" class="tag essence">精华</span
@@ -20,7 +29,7 @@
         v-if="post.status === 'FORCED' || post.status === 'DELETED'"
         :title="
           post.status === 'FORCED'
-            ? '该帖子已被管理员下架，无法恢复'
+            ? '该帖子已被管理员隐藏，可在动态的“我的申诉”中提交说明'
             : '该帖子已删除'
         "
         type="warning"
@@ -40,18 +49,22 @@
         />
       </div>
       <div class="detail-actions">
-        <button :disabled="admin || !active" @click="share.open(post)">
-          <i aria-hidden="true" class="ph ph-share-fat" />{{ post.share_count || "转发" }}</button
-        ><button @click="focusReply()">
+        <button v-if="!admin" :disabled="!active" @click="share.open(post)">
+          <i aria-hidden="true" class="ph ph-share-fat" />{{
+            post.share_count || "转发"
+          }}</button
+        ><button @click="admin ? scrollReplies() : focusReply()">
           <i aria-hidden="true" class="ph ph-chat-circle" />{{
             post.reply_count || "回复"
           }}</button
         ><button
+          v-if="!admin"
           :class="{ liked: flag(post.liked) }"
           :disabled="!active || postLiking"
           @click="likePost"
         >
-          <i aria-hidden="true"
+          <i
+            aria-hidden="true"
             :class="
               flag(post.liked) ? 'ph-fill ph-thumbs-up' : 'ph ph-thumbs-up'
             "
@@ -81,10 +94,12 @@
             </button>
           </div>
         </div>
-        <div v-if="active" class="reply-editor">
+        <div v-if="active && !admin" class="reply-editor">
           <div v-if="replyTarget" class="reply-target">
             回复 {{ replyTarget.display_name || replyTarget.author }}
-            <button @click="replyTarget = null"><i aria-hidden="true" class="ph ph-x" /></button>
+            <button @click="replyTarget = null">
+              <i aria-hidden="true" class="ph ph-x" />
+            </button>
           </div>
           <el-input
             ref="replyInput"
@@ -142,7 +157,8 @@
                     ? "收起回复"
                     : "展开 " + (childrenOf(root.id).length - 3) + " 条回复"
                 }}
-                <i aria-hidden="true"
+                <i
+                  aria-hidden="true"
                   :class="
                     expanded.has(root.id)
                       ? 'ph ph-caret-up'
@@ -168,8 +184,12 @@
     <el-empty v-else-if="!loading" description="帖子不存在或已被下架"
       ><el-button @click="back">返回社区</el-button></el-empty
     ><CommunityShare
+      v-if="!admin"
       ref="share"
-      @shared="post.share_count = Number(post.share_count || 0) + 1"
+      @shared="
+        (id, count) =>
+          (post.share_count = Number(post.share_count || 0) + count)
+      "
     />
   </main>
 </template>
@@ -181,6 +201,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import request from "@/api/request";
 import { postText, postImages, flag } from "@/utils/community";
 import CommunityAuthor from "@/components/CommunityAuthor.vue";
+import PostSafety from "@/components/PostSafety.vue";
 import CommunityReply from "@/components/CommunityReply.vue";
 import CommunityShare from "@/components/CommunityShare.vue";
 const route = useRoute(),
@@ -270,9 +291,17 @@ async function load() {
   }
 }
 function back() {
+  const returnTo=route.query.returnTo;
+  if(typeof returnTo==='string' && /^\/(student|teacher|admin)\//.test(returnTo)){
+    if(router.options.history.state.back===returnTo)router.back();else router.replace(returnTo);
+    return;
+  }
   const previous = router.options.history.state.back;
   if (typeof previous === "string" && previous.startsWith("/")) router.back();
   else router.push("/" + getRole().toLowerCase() + "/activity");
+}
+function scrollReplies() {
+  document.getElementById("replies")?.scrollIntoView({ behavior: "smooth" });
 }
 async function focusReply(reply = null) {
   replyTarget.value = reply;
@@ -355,6 +384,14 @@ watch(
 );
 </script>
 <style scoped>
+.author-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .post-page {
   min-height: 100vh;
   background: #fff;

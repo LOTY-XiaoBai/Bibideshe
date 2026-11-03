@@ -12,7 +12,7 @@
       </div>
 
       <nav class="sidebar__nav">
-        <div class="nav-group">核心数据</div>
+        <div class="nav-group">导航栏</div>
         <RouterLink
           v-for="item in menus"
           :key="item.path"
@@ -21,7 +21,7 @@
           active-class="is-active"
         >
           <i :class="item.icon" />
-          <span>{{ item.label }}</span>
+          <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
           <el-badge
             v-if="item.path === '/admin/ads' && pendingOrderCount > 0"
             :value="pendingOrderCount"
@@ -32,7 +32,7 @@
 
       <div class="sidebar__footer">
         <button type="button" class="logout-btn" @click="handleLogout">
-          <i class="ph ph-sign-out" />
+          <i aria-hidden="true" class="ph ph-sign-out" />
           <span>退出登录</span>
         </button>
       </div>
@@ -49,6 +49,11 @@
 </template>
 
 <script setup>
+import CountBadge from '@/components/CountBadge.vue'
+import { useUnread } from '@/stores/unread'
+const unread = useUnread()
+function menuCount(path){return path.endsWith('/activity')?unread.activityCount:path.endsWith('/chat')?(path.startsWith('/admin')?unread.data.violations:unread.chatCount):path.endsWith('/audit')?unread.data.questions:0}
+
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -62,6 +67,7 @@ let pollTimer = null
 const menus = [
   { path: '/admin/home', label: '管理首页', icon: 'ph ph-squares-four' },
   { path: '/admin/activity', label: '动态', icon: 'ph ph-newspaper' },
+  { path: '/admin/operations', label: '操作记录', icon: 'ph ph-clipboard-text' },
   { path: '/admin/accounts', label: '账号管理', icon: 'ph ph-user-minus' },
   { path: '/admin/courses', label: '课程管理', icon: 'ph ph-books' },
   { path: '/admin/ads', label: '广告与订单', icon: 'ph ph-megaphone' },
@@ -79,7 +85,7 @@ async function refreshPendingOrders() {
 }
 
 function handleLogout() {
-  userStore.logout()
+  userStore.logout(true)
   router.replace('/login')
 }
 

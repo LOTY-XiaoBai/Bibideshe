@@ -25,7 +25,7 @@
           active-class="is-active"
         >
           <i :class="item.icon" />
-          <span>{{ item.label }}</span>
+          <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
 
         <div class="nav-group-title">教学与考核</div>
@@ -37,7 +37,7 @@
           active-class="is-active"
         >
           <i :class="item.icon" />
-          <span>{{ item.label }}</span>
+          <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
 
         <div class="nav-group-title">生态服务</div>
@@ -49,13 +49,13 @@
           active-class="is-active"
         >
           <i :class="item.icon" />
-          <span>{{ item.label }}</span>
+          <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
       </nav>
 
       <div class="sidebar__footer">
         <button type="button" class="logout-btn" @click="handleLogout">
-          <i class="ph ph-sign-out" />
+          <i aria-hidden="true" class="ph ph-sign-out" />
           <span>退出登录</span>
         </button>
       </div>
@@ -72,6 +72,11 @@
 </template>
 
 <script setup>
+import CountBadge from '@/components/CountBadge.vue'
+import { useUnread } from '@/stores/unread'
+const unread = useUnread()
+function menuCount(path){return path.endsWith('/activity')?unread.activityCount:path.endsWith('/chat')?(path.startsWith('/admin')?unread.data.violations:unread.chatCount):path.endsWith('/audit')?unread.data.questions:0}
+
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -119,7 +124,7 @@ function goSettings() {
 }
 
 function handleLogout() {
-  userStore.logout()
+  userStore.logout(true)
   router.replace('/login')
 }
 </script>

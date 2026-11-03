@@ -24,9 +24,14 @@ function isAccountBanned(payload) {
   )
 }
 
+function staleSession(config) {
+  return config?.authTokenSnapshot && config.authTokenSnapshot !== getToken()
+}
+
 request.interceptors.request.use(
   (config) => {
-    const token = getToken()
+    const token = config.headers.Authorization?.replace(/^Bearer /, '') || getToken()
+    config.authTokenSnapshot = token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -37,10 +42,17 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => {
+    if (staleSession(response.config)) {
+      return Promise.reject(new Error('会话已结束'))
+    }
     const res = response.data
     if (res && typeof res.code === 'number') {
       if (res.code === 200) {
+        if (!['get','head'].includes(response.config.method) && !response.config.url?.startsWith('/api/unread')) window.dispatchEvent(new Event('unread-changed'))
         return res
+      }
+      if (response.config.silent || staleSession(response.config)) {
+        return Promise.reject(new Error(res.message || '请求已结束'))
       }
       if (isAccountBanned(res)) {
         showBanDialog(res.data)
@@ -62,6 +74,9 @@ request.interceptors.response.use(
     return res
   },
   (error) => {
+    if (error.config?.silent || staleSession(error.config)) {
+      return Promise.reject(error)
+    }
     const payload = error.response?.data
     if (isAccountBanned(payload)) {
       showBanDialog(payload.data)

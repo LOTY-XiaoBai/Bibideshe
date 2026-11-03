@@ -200,6 +200,17 @@ const routes = [
         meta: { title: "管理首页" },
       },
       {
+        path: "operations",
+        component: () => import("@/components/CommunityOperations.vue"),
+        meta: { title: "操作记录" },
+      },
+      {
+        path: "community-users",
+        component: () => import("@/components/CommunityModeration.vue"),
+        props: { fullPage: true },
+        meta: { title: "社区用户管理" },
+      },
+      {
         path: "accounts",
         name: "AdminAccounts",
         component: () => import("@/views/admin/AccountsView.vue"),

@@ -19,8 +19,10 @@ class CommunityIntegrationTests {
  @Autowired ProfileShopService extra;
  @Autowired JdbcTemplate db;
  @Autowired org.springframework.web.context.WebApplicationContext web;
- private final String subject="integration-"+UUID.randomUUID();
- @BeforeEach void login(){AuthContext.set(new AuthUser(null,subject,UserRole.ADMIN));}
+ private final long userId=7_000_000_000_000L+java.util.concurrent.ThreadLocalRandom.current().nextLong(1_000_000_000_000L);
+ private final String subject=Long.toString(userId);
+ @BeforeEach void login(){db.update("INSERT INTO student(student_id,nickname,password) VALUES(?,?,'disabled-test-account')",userId,subject);AuthContext.set(new AuthUser(userId,subject,UserRole.STUDENT));}
+ private void asAdmin(Runnable action){var current=AuthContext.get();AuthContext.set(new AuthUser(null,"test-reviewer",UserRole.ADMIN));try{action.run();}finally{AuthContext.set(current);}}
  @AfterEach void clear(){AuthContext.clear();}
  private Map<String,Object> body(String title){return Map.of("title",title,"blocks","[{\"type\":\"text\",\"value\":\"正文\"}]");}
  @Test void viewsAreUniquePerAccountPerDayAndEditPreservesPublishTime(){
@@ -29,8 +31,8 @@ class CommunityIntegrationTests {
   service.save(id,body("修改标题"));assertThat(service.detail(id).get("created_at")).isEqualTo(before.get("created_at"));
  }
  @Test void rejectsBadPostsAndUnsafeImages(){
-  service.addWord(Map.of("word","测试违禁词"));
-  assertThatThrownBy(()->service.save(null,body("测试违禁词"))).isInstanceOf(BusinessException.class).hasMessageContaining("不良内容");
+  asAdmin(()->service.addWord(Map.of("word","测试违禁词")));
+  long masked=service.save(null,body("测试违禁词"));assertThat(service.detail(masked).get("title")).isEqualTo("*****");
   assertThatThrownBy(()->service.save(null,Map.of("title","图片","blocks","[{\"type\":\"image\",\"value\":\"javascript:alert(1)\"}]"))).isInstanceOf(BusinessException.class);
  }
  @Test void titleIsRequiredButBodyIsOptional(){
@@ -60,7 +62,7 @@ class CommunityIntegrationTests {
  }
  @Test void feedSupportsSearchFeaturedAndMine(){
   String title="检索"+UUID.randomUUID();long id=service.save(null,body(title));
-  service.action(id,"feature");service.action(id,"pin");
+  asAdmin(()->{service.action(id,"feature");service.action(id,"pin");});
   var feed=service.feed(title,"featured","community",1);
   assertThat(((Number)feed.get("total")).longValue()).isEqualTo(1L);
   assertThat((List<?>)feed.get("list")).hasSize(1);
@@ -79,15 +81,15 @@ class CommunityIntegrationTests {
    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.birth_date").exists());
  }
  @Test void fourthMaskedReplyMutesOnlyCommunityAndAdminCanUnmute(){
-  long id=service.save(null,body("回复检测"));service.addWord(Map.of("word","测试违禁词"));
+  long id=service.save(null,body("回复检测"));asAdmin(()->service.addWord(Map.of("word","测试违禁词")));
   for(int i=0;i<4;i++)service.reply(id,Map.of("content","测试违禁词"));
   var replies=(List<Map<String,Object>>)service.detail(id).get("replies");assertThat(replies).hasSize(4);assertThat(replies.get(0).get("content")).isEqualTo("*****");
   assertThatThrownBy(()->service.reply(id,Map.of("content","普通回复"))).isInstanceOf(BusinessException.class).hasMessageContaining("禁言");
   assertThat(service.notices(1)).anyMatch(n->"WARNING".equals(n.get("kind")));
-  service.unmute(CommunityService.owner());service.reply(id,Map.of("content","解禁成功"));
+  String owner=CommunityService.owner();asAdmin(()->service.unmute(owner));service.reply(id,Map.of("content","解禁成功"));
  }
  @Test void forcedHiddenAndDeletedPostsCannotBeRestored(){
-  long id=service.save(null,body("下架测试"));service.action(id,"forceHide");
+  long id=service.save(null,body("下架测试"));asAdmin(()->service.action(id,"forceHide"));
   assertThatThrownBy(()->service.action(id,"restore")).isInstanceOf(BusinessException.class);
   assertThatThrownBy(()->service.save(id,body("再次发布"))).isInstanceOf(BusinessException.class);
   long deleted=service.save(null,body("删除测试"));service.action(deleted,"delete");

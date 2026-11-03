@@ -27,3 +27,9 @@ Thumbs.db
 
 # 旧仓库的本地可恢复备份
 .git-backups/
+
+# 本机Navicat导出/数据库备份（只提交受控建表与迁移脚本）
+/bishe.sql
+**/*dump*.sql
+**/*.sql.gz
+**/*.bak

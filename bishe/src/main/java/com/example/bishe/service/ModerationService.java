@@ -61,6 +61,7 @@ public class ModerationService {
     private final GroupChatMapper groupChatMapper;
     private final SocialUserService socialUserService;
     private final ChatPushService chatPushService;
+    private final AdminOperationService operations;
 
     public ModerationService(SpecialWordMapper specialWordMapper,
                              ChatViolationMapper chatViolationMapper,
@@ -70,7 +71,7 @@ public class ModerationService {
                              TeacherMapper teacherMapper,
                              GroupChatMapper groupChatMapper,
                              SocialUserService socialUserService,
-                             ChatPushService chatPushService) {
+                             ChatPushService chatPushService,AdminOperationService operations) {
         this.specialWordMapper = specialWordMapper;
         this.chatViolationMapper = chatViolationMapper;
         this.userWarningMapper = userWarningMapper;
@@ -80,6 +81,7 @@ public class ModerationService {
         this.groupChatMapper = groupChatMapper;
         this.socialUserService = socialUserService;
         this.chatPushService = chatPushService;
+        this.operations=operations;
     }
 
     // ---------- 特殊词 CRUD ----------
@@ -94,6 +96,7 @@ public class ModerationService {
             throw new BusinessException("特殊词不能为空");
         }
         String word = request.getWord().trim();
+        if(word.length()>100)throw new BusinessException("特殊词最多100字");
         if (specialWordMapper.findByWord(word) != null) {
             throw new BusinessException("该特殊词已存在");
         }
@@ -102,6 +105,7 @@ public class ModerationService {
         entity.setEnabled(request.getEnabled() == null ? 1 : request.getEnabled());
         entity.setCreatedBy(adminId);
         specialWordMapper.insert(entity);
+        operations.record("新增共用屏蔽词","WORD",entity.getWordId(),"",null,"",word);
         return specialWordMapper.findById(entity.getWordId());
     }
 
@@ -111,6 +115,7 @@ public class ModerationService {
             throw new BusinessException("特殊词不存在");
         }
         specialWordMapper.updateEnabled(wordId, enabled == 1 ? 1 : 0);
+        operations.record(enabled==1?"启用共用屏蔽词":"停用共用屏蔽词","WORD",wordId,"",null,"",specialWordMapper.findById(wordId).getWord());
     }
 
     @Transactional
@@ -118,7 +123,9 @@ public class ModerationService {
         if (specialWordMapper.findById(wordId) == null) {
             throw new BusinessException("特殊词不存在");
         }
+        String word=specialWordMapper.findById(wordId).getWord();
         specialWordMapper.deleteById(wordId);
+        operations.record("删除共用屏蔽词","WORD",wordId,"",null,"",word);
     }
 
     /**
@@ -202,6 +209,7 @@ public class ModerationService {
             case "IGNORE" -> {
                 chatViolationMapper.updateHandle(violation.getViolationId(), VIOLATION_IGNORED,
                         adminId, request.getNote());
+                operations.record("忽略聊天特殊词命中","CHAT",violation.getMessageId(),Long.toString(violation.getSenderId()),null,"",request.getNote());
             }
             case "WARN" -> {
                 String content = StringUtils.hasText(request.getWarnContent())
@@ -258,6 +266,7 @@ public class ModerationService {
         warning.setIsDismissed(0);
         warning.setChatMessageId(sysMsg.getMessageId());
         userWarningMapper.insert(warning);
+        operations.record("警告用户","USER",userId,Long.toString(userId),null,"",reason+"；"+warnContent);
 
         try {
             chatPushService.pushNewMessage(toSystemMessageVO(sysMsg));
@@ -317,6 +326,7 @@ public class ModerationService {
                 throw new BusinessException("学生不存在");
             }
             studentMapper.ban(request.getAccountId(), reason, adminId);
+            operations.record("封禁账号","USER",request.getAccountId(),"STUDENT:"+request.getAccountId(),null,"",reason);
             notifyForceLogout(request.getAccountId(), reason);
             return;
         }
@@ -326,6 +336,7 @@ public class ModerationService {
                 throw new BusinessException("教师不存在");
             }
             teacherMapper.ban(request.getAccountId(), reason, adminId);
+            operations.record("封禁账号","USER",request.getAccountId(),"TEACHER:"+request.getAccountId(),null,"",reason);
             notifyForceLogout(request.getAccountId(), reason);
             return;
         }
@@ -343,6 +354,7 @@ public class ModerationService {
                 throw new BusinessException("学生不存在");
             }
             studentMapper.unban(accountId);
+            operations.record("解封账号","USER",accountId,"STUDENT:"+accountId,null,"","");
             return;
         }
         if ("teacher".equals(type) || String.valueOf(accountId).startsWith("2")) {
@@ -350,6 +362,7 @@ public class ModerationService {
                 throw new BusinessException("教师不存在");
             }
             teacherMapper.unban(accountId);
+            operations.record("解封账号","USER",accountId,"TEACHER:"+accountId,null,"","");
             return;
         }
         throw new BusinessException("无法识别账号类型");
@@ -367,6 +380,7 @@ public class ModerationService {
                 throw new BusinessException("学生不存在");
             }
             studentMapper.softDelete(accountId, banReason, adminId);
+            operations.record("软删除账号","USER",accountId,"STUDENT:"+accountId,null,"",banReason);
             notifyForceLogout(accountId, banReason);
             return;
         }
@@ -375,6 +389,7 @@ public class ModerationService {
                 throw new BusinessException("教师不存在");
             }
             teacherMapper.softDelete(accountId, banReason, adminId);
+            operations.record("软删除账号","USER",accountId,"TEACHER:"+accountId,null,"",banReason);
             notifyForceLogout(accountId, banReason);
             return;
         }
@@ -428,12 +443,14 @@ public class ModerationService {
         Student student = studentMapper.findById(userId);
         if (student != null) {
             studentMapper.ban(userId, reason, adminId);
+            operations.record("封禁账号","USER",userId,"STUDENT:"+userId,null,"",reason);
             notifyForceLogout(userId, reason);
             return;
         }
         Teacher teacher = teacherMapper.findById(userId);
         if (teacher != null) {
             teacherMapper.ban(userId, reason, adminId);
+            operations.record("封禁账号","USER",userId,"TEACHER:"+userId,null,"",reason);
             notifyForceLogout(userId, reason);
             return;
         }

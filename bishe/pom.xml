@@ -87,6 +87,11 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource><directory>src/main/resources</directory></resource>
+            <resource><directory>docker/mysql/init</directory><targetPath>database/base</targetPath><includes><include>*.sql</include></includes></resource>
+            <resource><directory>sql</directory><targetPath>database/migrations</targetPath><includes><include>*.sql</include></includes></resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

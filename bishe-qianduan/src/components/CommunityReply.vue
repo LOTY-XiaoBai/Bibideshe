@@ -15,17 +15,19 @@
         <span>{{ nested ? "" : "第" + floor + "楼" }}</span>
         <div>
           <button
+            v-if="!admin"
             :class="{ liked: flag(reply.liked) }"
             :disabled="flag(reply.deleted) || !active || busy"
             @click="$emit('like', reply)"
           >
-            <i aria-hidden="true"
+            <i
+              aria-hidden="true"
               :class="
                 flag(reply.liked) ? 'ph-fill ph-thumbs-up' : 'ph ph-thumbs-up'
               "
             />{{ reply.likes || "赞" }}</button
           ><button
-            v-if="active && !flag(reply.deleted)"
+            v-if="!admin && active && !flag(reply.deleted)"
             @click="$emit('reply', reply)"
           >
             <i aria-hidden="true" class="ph ph-chat-circle" />回复</button

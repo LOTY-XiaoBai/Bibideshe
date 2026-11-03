@@ -19,6 +19,7 @@ import {
   revokeCurrentToken,
 } from '@/api/auth'
 import { disconnectChatWs } from '@/utils/websocket'
+import { ElMessage } from 'element-plus'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(getToken())
@@ -153,15 +154,16 @@ export const useUserStore = defineStore('user', () => {
     return profile.value
   }
 
-  function logout() {
+  function logout(notify = false) {
     disconnectChatWs()
     if (token.value) {
-      revokeCurrentToken().catch(() => {})
+      revokeCurrentToken(token.value).catch(() => {})
     }
     token.value = ''
     role.value = ''
     profile.value = null
     clearAuth()
+    if (notify) ElMessage.success('已退出登录')
   }
 
   return {

@@ -1,7 +1,6 @@
 services:
   mysql:
     image: mysql:8.0
-    container_name: bishe-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
@@ -24,7 +23,6 @@ services:
 
   redis:
     image: redis:8.0-alpine
-    container_name: bishe-redis
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
@@ -41,7 +39,6 @@ services:
     build:
       context: ./bishe
       dockerfile: Dockerfile
-    container_name: bishe-backend
     restart: unless-stopped
     depends_on:
       mysql:
@@ -74,7 +71,6 @@ services:
     build:
       context: ./bishe-qianduan
       dockerfile: Dockerfile
-    container_name: bishe-frontend
     restart: unless-stopped
     depends_on:
       - backend

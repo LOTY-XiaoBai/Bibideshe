@@ -11,7 +11,7 @@
           @click="activeTab = tab.key"
         >
           {{ tab.label }}
-          <span v-if="tab.key === 'requests' && pendingCount" class="badge">{{ pendingCount }}</span>
+          <CountBadge :count="tab.key==='requests'?unread.data.requests:tab.key==='groups'?unread.groupCount:unread.privateCount"/>
         </button>
       </div>
 
@@ -51,7 +51,7 @@
           >
             <div class="system-avatar">通</div>
             <div class="list-item__body">
-              <div class="list-item__title">系统通知</div>
+              <div class="list-item__title">系统通知 <CountBadge :count="unread.count('private',0)"/></div>
               <div class="list-item__sub">平台警告与文明用语提醒</div>
             </div>
           </button>
@@ -65,7 +65,7 @@
           >
             <img :src="avatarOf(f)" alt="" class="mini-avatar" />
             <div class="list-item__body">
-              <div class="list-item__title">{{ f.displayName }}</div>
+              <div class="list-item__title">{{ f.displayName }} <CountBadge :count="unread.count('private',f.userId)"/></div>
               <div class="list-item__sub">{{ f.signature || '暂无签名' }}</div>
             </div>
           </button>
@@ -91,7 +91,7 @@
             <img :src="groupAvatarOf(g)" alt="" class="mini-avatar" />
             <div class="list-item__body">
               <div class="list-item__title">
-                {{ g.groupName }}
+                {{ g.groupName }} <CountBadge :count="unread.count('group',g.groupId)"/>
                 <el-tag v-if="g.myAdminLevel === 1" size="small" type="warning">群主</el-tag>
                 <el-tag v-else-if="g.myAdminLevel === 2" size="small">管理</el-tag>
               </div>
@@ -451,11 +451,16 @@
 </template>
 
 <script setup>
+import CountBadge from '@/components/CountBadge.vue'
+import {useUnread} from '@/stores/unread'
+const unread=useUnread()
+
 function postLink(content) {
   const last = String(content || '').split('\n').pop()
   return /^\/community\/post\/\d+$/.test(last) ? last : ''
 }
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { resolveMediaUrl, defaultAvatar } from '@/utils/media'
@@ -509,7 +514,8 @@ const tabs = [
   { key: 'requests', label: '申请' },
 ]
 
-const activeTab = ref('friends')
+const route = useRoute()
+const activeTab = ref(route.query.tab === 'requests' ? 'requests' : 'friends')
 const friends = ref([])
 const groups = ref([])
 const receivedRequests = ref([])
@@ -844,13 +850,16 @@ async function openGroup(group) {
 async function loadMessages() {
   if (!session.value) return
   messagesLoading.value = true
+  const current={...session.value}
   try {
     const res =
-      session.value.type === 'private'
-        ? await fetchPrivateHistory(session.value.id)
-        : await fetchGroupHistory(session.value.id)
+      current.type === 'private'
+        ? await fetchPrivateHistory(current.id)
+        : await fetchGroupHistory(current.id)
+    if(session.value?.type!==current.type||session.value?.id!==current.id)return
     messages.value = res.data || []
     scrollToBottom()
+    await markCurrentRead()
   } catch {
     messages.value = []
   } finally {
@@ -892,7 +901,8 @@ function handleWsPayload(payload) {
   if (!payload?.type) return
   if (payload.type === 'NEW_MESSAGE' || payload.type === 'UPDATE') {
     const msg = payload.data
-    if (messageBelongsToSession(msg)) upsertMessage(msg)
+    if (messageBelongsToSession(msg)) {upsertMessage(msg);markCurrentRead()}
+    unread.refresh()
   } else if (payload.type === 'RECALL') {
     const mid = payload.data?.messageId
     if (!mid) return
@@ -1255,6 +1265,13 @@ function pkTagType(r) {
   return 'warning'
 }
 
+async function markCurrentRead(){
+  if(!session.value||document.hidden||!document.hasFocus())return
+  const last=messages.value.reduce((n,m)=>Math.max(n,Number(m.messageId)||0),0)
+  try{await unread.readSession(session.value.type,session.value.id,last)}catch{}
+}
+function refreshVisible(){if(!document.hidden){markCurrentRead();unread.refresh()}}
+watch(()=>unread.data.requests,()=>loadRequests())
 watch(activeTab, (tab) => {
   if (tab === 'friends') loadFriends()
   if (tab === 'groups') loadGroups()
@@ -1262,6 +1279,8 @@ watch(activeTab, (tab) => {
 })
 
 onMounted(() => {
+  window.addEventListener('focus',refreshVisible)
+  document.addEventListener('visibilitychange',refreshVisible)
   connectChatWs()
   unsubChat = onChatEvent(handleWsPayload)
   loadFriends()
@@ -1270,6 +1289,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('focus',refreshVisible)
+  document.removeEventListener('visibilitychange',refreshVisible)
   unsubChat?.()
   unsubGroup?.()
 })

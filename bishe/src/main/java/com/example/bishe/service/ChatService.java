@@ -31,19 +31,21 @@ public class ChatService {
     private final SocialUserService socialUserService;
     private final ChatPushService chatPushService;
     private final ModerationService moderationService;
+    private final AdminOperationService operations;
 
     public ChatService(ChatRecordMapper chatRecordMapper,
                        FriendService friendService,
                        GroupService groupService,
                        SocialUserService socialUserService,
                        ChatPushService chatPushService,
-                       ModerationService moderationService) {
+                       ModerationService moderationService,AdminOperationService operations) {
         this.chatRecordMapper = chatRecordMapper;
         this.friendService = friendService;
         this.groupService = groupService;
         this.socialUserService = socialUserService;
         this.chatPushService = chatPushService;
         this.moderationService = moderationService;
+        this.operations=operations;
     }
 
     @Transactional
@@ -244,8 +246,9 @@ public class ChatService {
         if (request.getContent() == null) {
             throw new BusinessException("消息内容不能为空");
         }
-        requireMessage(request.getMessageId());
+        ChatRecord original=requireMessage(request.getMessageId());
         chatRecordMapper.updateContent(request.getMessageId(), request.getContent());
+        operations.record("修改聊天内容","CHAT",request.getMessageId(),original.getSenderId().toString(),null,"","原内容："+original.getContent()+"；新内容："+request.getContent());
         ChatMessageVO vo = toVO(chatRecordMapper.findById(request.getMessageId()), true);
         chatPushService.pushContentUpdate(vo);
     }
@@ -254,6 +257,7 @@ public class ChatService {
     public void adminSoftDelete(Long messageId) {
         ChatRecord record = requireMessage(messageId);
         chatRecordMapper.softDelete(messageId);
+        operations.record("删除聊天消息","CHAT",messageId,record.getSenderId().toString(),null,"",record.getContent());
         chatPushService.pushRecall(messageId, record.getIsPrivate(), record.getReceiverId(),
                 record.getGroupId(), null);
     }

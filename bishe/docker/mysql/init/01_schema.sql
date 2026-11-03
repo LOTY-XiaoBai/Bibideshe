@@ -9,7 +9,7 @@
 SET NAMES utf8mb4;
 
 -- 1. 学生账号表
-CREATE TABLE `student` (
+CREATE TABLE IF NOT EXISTS `student` (
   `student_id` BIGINT NOT NULL COMMENT '学生ID(1开头)',
   `nickname` VARCHAR(50) NOT NULL COMMENT '学生昵称',
   `password` VARCHAR(255) NOT NULL COMMENT '学生密码',
@@ -25,7 +25,7 @@ CREATE TABLE `student` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生账号表';
 
 -- 2. 教师账号表
-CREATE TABLE `teacher` (
+CREATE TABLE IF NOT EXISTS `teacher` (
   `teacher_id` BIGINT NOT NULL COMMENT '教师ID(2开头)',
   `name` VARCHAR(50) NOT NULL COMMENT '教师姓名',
   `signature` VARCHAR(255) COMMENT '教师个性签名',
@@ -42,14 +42,14 @@ CREATE TABLE `teacher` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教师账号表';
 
 -- 3. 管理员账号表 (已将 admin_id 类型合并为 VARCHAR)
-CREATE TABLE `admin` (
+CREATE TABLE IF NOT EXISTS `admin` (
   `admin_id` VARCHAR(20) NOT NULL COMMENT '管理员ID',
   `password` VARCHAR(255) NOT NULL COMMENT '管理员密码',
   PRIMARY KEY (`admin_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员账号表';
 
 -- 4. 广告表 (已合并 title, price, create_time, is_deleted, publisher_id 类型变更)
-CREATE TABLE `advertisement` (
+CREATE TABLE IF NOT EXISTS `advertisement` (
   `ad_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '广告ID',
   `title` VARCHAR(100) COMMENT '商品/广告标题',
   `content` TEXT COMMENT '广告内容',
@@ -63,14 +63,14 @@ CREATE TABLE `advertisement` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='广告表';
 
 -- 5. 好友表
-CREATE TABLE `friend` (
+CREATE TABLE IF NOT EXISTS `friend` (
   `friend_a_id` BIGINT NOT NULL COMMENT '好友AID(学生/教师ID)',
   `friend_b_id` BIGINT NOT NULL COMMENT '好友BID(学生/教师ID)',
   PRIMARY KEY (`friend_a_id`, `friend_b_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友表';
 
 -- 5.1 好友申请表
-CREATE TABLE `friend_request` (
+CREATE TABLE IF NOT EXISTS `friend_request` (
   `request_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '申请ID',
   `requester_id` BIGINT NOT NULL COMMENT '申请人ID(学生/教师ID)',
   `receiver_id` BIGINT NOT NULL COMMENT '被申请人ID(学生/教师ID)',
@@ -80,7 +80,7 @@ CREATE TABLE `friend_request` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友申请表';
 
 -- 6. 聊天记录表 (已合并 receiver_id 私聊接收人与 is_deleted 软删控制)
-CREATE TABLE `chat_record` (
+CREATE TABLE IF NOT EXISTS `chat_record` (
   `message_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '消息记录ID',
   `send_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
   `sender_id` BIGINT NOT NULL COMMENT '发送人ID',
@@ -95,14 +95,14 @@ CREATE TABLE `chat_record` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天记录表';
 
 -- 7. 群聊与用户表
-CREATE TABLE `group_user` (
+CREATE TABLE IF NOT EXISTS `group_user` (
   `group_id` BIGINT NOT NULL COMMENT '加入群聊ID',
   `user_id` BIGINT NOT NULL COMMENT '用户ID(教师/学生ID)',
   PRIMARY KEY (`group_id`, `user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群聊与用户关联表';
 
 -- 8. 群聊表 (已合并群名、头像、简介、解散及管理员封禁状态字段)
-CREATE TABLE `group_chat` (
+CREATE TABLE IF NOT EXISTS `group_chat` (
   `group_id` BIGINT NOT NULL COMMENT '群号ID',
   `group_name` VARCHAR(100) COMMENT '群聊名称',
   `group_avatar` VARCHAR(255) COMMENT '群头像(URL)',
@@ -118,7 +118,7 @@ CREATE TABLE `group_chat` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群聊基本信息表';
 
 -- 9. 群聊与管理ID表 (已合并管理员权限等级字段)
-CREATE TABLE `group_admin` (
+CREATE TABLE IF NOT EXISTS `group_admin` (
   `group_id` BIGINT NOT NULL COMMENT '群号ID',
   `admin_id` BIGINT NOT NULL COMMENT '管理员ID(学生/教师ID)',
   `admin_level` TINYINT DEFAULT 1 COMMENT '管理员等级: 1=群主, 2=普通管理员',
@@ -126,7 +126,7 @@ CREATE TABLE `group_admin` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群聊管理员表';
 
 -- 10. 商品/订单表 (已合并多身份买家、时间、状态流转和售后处理体系)
-CREATE TABLE `order_record` (
+CREATE TABLE IF NOT EXISTS `order_record` (
   `order_id` BIGINT NOT NULL COMMENT '订单ID',
   `ad_id` BIGINT NOT NULL COMMENT '广告ID',
   `buyer_id` BIGINT NOT NULL COMMENT '买家ID(学生/教师ID)',
@@ -142,7 +142,7 @@ CREATE TABLE `order_record` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品订单表';
 
 -- 10.1 订单评价表 (买家关联字段重命名适配)
-CREATE TABLE `order_evaluation` (
+CREATE TABLE IF NOT EXISTS `order_evaluation` (
   `evaluation_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '评价ID',
   `order_id` BIGINT NOT NULL COMMENT '订单ID',
   `buyer_id` BIGINT NOT NULL COMMENT '买家ID(学生/教师ID)',
@@ -153,7 +153,7 @@ CREATE TABLE `order_evaluation` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单评价表';
 
 -- 11. 选择题表
-CREATE TABLE `question_choice` (
+CREATE TABLE IF NOT EXISTS `question_choice` (
   `question_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '题目ID',
   `content` TEXT NOT NULL COMMENT '题目内容',
   `answer` VARCHAR(255) NOT NULL COMMENT '答案',
@@ -164,7 +164,7 @@ CREATE TABLE `question_choice` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='选择题表';
 
 -- 11.1 选择题选项表 (已补充选项内容字段)
-CREATE TABLE `question_choice_option` (
+CREATE TABLE IF NOT EXISTS `question_choice_option` (
   `question_id` BIGINT NOT NULL COMMENT '题目ID',
   `option_code` VARCHAR(10) NOT NULL COMMENT '选项编号(如A,B,C,D)',
   `option_content` VARCHAR(500) COMMENT '选项内容',
@@ -172,7 +172,7 @@ CREATE TABLE `question_choice_option` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='选择题选项表';
 
 -- 12. 判断题表
-CREATE TABLE `question_judge` (
+CREATE TABLE IF NOT EXISTS `question_judge` (
   `question_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '题目ID',
   `content` TEXT NOT NULL COMMENT '题目内容',
   `answer` VARCHAR(255) NOT NULL COMMENT '答案',
@@ -183,7 +183,7 @@ CREATE TABLE `question_judge` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判断题表';
 
 -- 13. 解答题表
-CREATE TABLE `question_answer` (
+CREATE TABLE IF NOT EXISTS `question_answer` (
   `question_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '题目ID',
   `content` TEXT NOT NULL COMMENT '题目内容',
   `answer` TEXT NOT NULL COMMENT '答案',
@@ -194,7 +194,7 @@ CREATE TABLE `question_answer` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='解答题表';
 
 -- 14. 考试表 (已合并成绩公布控制配置)
-CREATE TABLE `exam` (
+CREATE TABLE IF NOT EXISTS `exam` (
   `exam_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '考试ID',
   `course_id` BIGINT NOT NULL COMMENT '课程ID',
   `publisher_id` BIGINT NOT NULL COMMENT '发布者ID(教师ID)',
@@ -205,7 +205,7 @@ CREATE TABLE `exam` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='考试表';
 
 -- 15. 考试题目表 (联合主键已补全 question_type)
-CREATE TABLE `exam_question` (
+CREATE TABLE IF NOT EXISTS `exam_question` (
   `exam_id` BIGINT NOT NULL COMMENT '考试ID',
   `question_id` BIGINT NOT NULL COMMENT '题目ID',
   `question_type` TINYINT NOT NULL COMMENT '题目类型: 1选择题, 2判断题, 3解答题',
@@ -214,7 +214,7 @@ CREATE TABLE `exam_question` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='考试题目关联表';
 
 -- 15.1 考试题目答题情况 (联合主键已补全 question_type)
-CREATE TABLE `exam_question_answer` (
+CREATE TABLE IF NOT EXISTS `exam_question_answer` (
   `exam_id` BIGINT NOT NULL COMMENT '考试ID',
   `question_id` BIGINT NOT NULL COMMENT '题目ID',
   `question_type` TINYINT NOT NULL COMMENT '题目类型: 1选择题, 2判断题, 3解答题',
@@ -227,7 +227,7 @@ CREATE TABLE `exam_question_answer` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='考试题目答题情况表';
 
 -- 16. 用户考试记录表 (已合并开始时间字段，用于限时校验)
-CREATE TABLE `user_exam_record` (
+CREATE TABLE IF NOT EXISTS `user_exam_record` (
   `student_id` BIGINT NOT NULL COMMENT '学生ID',
   `exam_id` BIGINT NOT NULL COMMENT '考试ID',
   `exam_score` DECIMAL(5,1) DEFAULT 0.0 COMMENT '考试得分',
@@ -237,7 +237,7 @@ CREATE TABLE `user_exam_record` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户考试总记录表';
 
 -- 17. 作业表 (已合并成绩公布控制配置)
-CREATE TABLE `homework` (
+CREATE TABLE IF NOT EXISTS `homework` (
   `homework_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '作业ID',
   `course_id` BIGINT NOT NULL COMMENT '课程ID',
   `publisher_id` BIGINT NOT NULL COMMENT '发布者ID(教师ID)',
@@ -248,7 +248,7 @@ CREATE TABLE `homework` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='作业主表';
 
 -- 18. 作业题目表 (已补全 question_type 联合主键)
-CREATE TABLE `homework_question` (
+CREATE TABLE IF NOT EXISTS `homework_question` (
   `homework_id` BIGINT NOT NULL COMMENT '作业ID',
   `question_id` BIGINT NOT NULL COMMENT '题目ID',
   `question_type` TINYINT NOT NULL COMMENT '题目类型: 1选择题, 2判断题, 3解答题',
@@ -257,7 +257,7 @@ CREATE TABLE `homework_question` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='作业题目关联表';
 
 -- 18.1 作业题目答题情况 (已补全 question_type 联合主键)
-CREATE TABLE `homework_question_answer` (
+CREATE TABLE IF NOT EXISTS `homework_question_answer` (
   `homework_id` BIGINT NOT NULL COMMENT '作业ID',
   `question_id` BIGINT NOT NULL COMMENT '题目ID',
   `question_type` TINYINT NOT NULL COMMENT '题目类型: 1选择题, 2判断题, 3解答题',
@@ -270,7 +270,7 @@ CREATE TABLE `homework_question_answer` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='作业题目答题情况表';
 
 -- 19. 用户作业记录
-CREATE TABLE `user_homework_record` (
+CREATE TABLE IF NOT EXISTS `user_homework_record` (
   `student_id` BIGINT NOT NULL COMMENT '学生ID',
   `homework_id` BIGINT NOT NULL COMMENT '作业ID',
   `homework_score` DECIMAL(5,1) DEFAULT 0.0 COMMENT '作业得分',
@@ -279,7 +279,7 @@ CREATE TABLE `user_homework_record` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户作业总记录表';
 
 -- 20. 教师评分记录 (已合并关联学生、课程、时间及唯一约束)
-CREATE TABLE `teacher_evaluation` (
+CREATE TABLE IF NOT EXISTS `teacher_evaluation` (
   `evaluation_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '打分ID(主键)',
   `teacher_id` BIGINT NOT NULL COMMENT '教师ID',
   `student_id` BIGINT NOT NULL COMMENT '打分学生ID',
@@ -291,7 +291,7 @@ CREATE TABLE `teacher_evaluation` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教师评分记录表';
 
 -- 21. 课程表
-CREATE TABLE `course` (
+CREATE TABLE IF NOT EXISTS `course` (
   `course_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '课程ID',
   `teacher_id` BIGINT NOT NULL COMMENT '主讲人ID(教师ID)',
   `course_name` VARCHAR(100) NOT NULL COMMENT '课程名字',
@@ -300,7 +300,7 @@ CREATE TABLE `course` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='课程主表';
 
 -- 22. 课程人员表
-CREATE TABLE `course_personnel` (
+CREATE TABLE IF NOT EXISTS `course_personnel` (
   `course_id` BIGINT NOT NULL COMMENT '课程ID',
   `student_id` BIGINT NOT NULL COMMENT '学生ID',
   `student_score` DECIMAL(5,1) DEFAULT 0.0 COMMENT '学生分数',
@@ -308,7 +308,7 @@ CREATE TABLE `course_personnel` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='选课与课程成绩表';
 
 -- 23. 签到记录表 (已合并发布者、状态、分值及结束时间字段)
-CREATE TABLE `check_in_record` (
+CREATE TABLE IF NOT EXISTS `check_in_record` (
   `check_in_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '签到ID',
   `course_id` BIGINT NOT NULL COMMENT '课程ID',
   `publisher_id` BIGINT NOT NULL COMMENT '发布者ID(教师ID)',
@@ -322,7 +322,7 @@ CREATE TABLE `check_in_record` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='签到发布记录表';
 
 -- 24. 签到与用户表
-CREATE TABLE `check_in_user` (
+CREATE TABLE IF NOT EXISTS `check_in_user` (
   `check_in_id` BIGINT NOT NULL COMMENT '签到ID',
   `student_id` BIGINT NOT NULL COMMENT '学生ID',
   `check_in_time` DATETIME COMMENT '实际签到时间',
@@ -331,7 +331,7 @@ CREATE TABLE `check_in_user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生签到明细表';
 
 -- 25. 错题本表 (已补全 question_type 联合主键)
-CREATE TABLE `error_book` (
+CREATE TABLE IF NOT EXISTS `error_book` (
   `student_id` BIGINT NOT NULL COMMENT '学生ID',
   `question_id` BIGINT NOT NULL COMMENT '题目ID',
   `question_type` TINYINT NOT NULL COMMENT '题目类型: 1选择题, 2判断题, 3解答题',
@@ -344,7 +344,7 @@ CREATE TABLE `error_book` (
 -- ========================================================
 
 -- 26. 特殊词表
-CREATE TABLE `special_word` (
+CREATE TABLE IF NOT EXISTS `special_word` (
   `word_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '特殊词ID',
   `word` VARCHAR(100) NOT NULL COMMENT '特殊词内容',
   `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用: 1启用, 0停用',
@@ -355,7 +355,7 @@ CREATE TABLE `special_word` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天特殊词监视表';
 
 -- 27. 特殊词命中/违规处理记录
-CREATE TABLE `chat_violation` (
+CREATE TABLE IF NOT EXISTS `chat_violation` (
   `violation_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '违规记录ID',
   `message_id` BIGINT NOT NULL COMMENT '关联聊天消息ID',
   `word_id` BIGINT DEFAULT NULL COMMENT '命中的特殊词ID',
@@ -377,7 +377,7 @@ CREATE TABLE `chat_violation` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='特殊词命中与处理记录';
 
 -- 28. 用户警告表
-CREATE TABLE `user_warning` (
+CREATE TABLE IF NOT EXISTS `user_warning` (
   `warning_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '警告ID',
   `user_id` BIGINT NOT NULL COMMENT '被警告用户ID(学生/教师)',
   `content` VARCHAR(1000) NOT NULL COMMENT '警告内容',
@@ -394,7 +394,7 @@ CREATE TABLE `user_warning` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户警告记录表';
 
 -- 写入预置特殊词数据
-INSERT INTO `special_word` (`word`, `enabled`, `created_by`) VALUES
+INSERT IGNORE INTO `special_word` (`word`, `enabled`, `created_by`) VALUES
 ('傻逼', 1, 'system'),
 ('去死', 1, 'system'),
 ('废物', 1, 'system'),
@@ -402,5 +402,4 @@ INSERT INTO `special_word` (`word`, `enabled`, `created_by`) VALUES
 ('混蛋', 1, 'system'),
 ('滚蛋', 1, 'system'),
 ('操', 1, 'system'),
-('妈的', 1, 'system')
-ON DUPLICATE KEY UPDATE `enabled` = VALUES(`enabled`);
+('妈的', 1, 'system');

@@ -63,14 +63,7 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-pagination
-        v-model:current-page="chatPage"
-        :page-size="pageSize"
-        :total="chatTotal"
-        layout="prev, pager, next"
-        class="pager"
-        @current-change="loadChats"
-      />
+      <ListPager v-model:page="chatPage" v-model:size="chatSize" :total="chatTotal" @change="loadChats" />
     </section>
 
     <section v-else-if="activeTab === 'group'" class="panel">
@@ -110,45 +103,10 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-pagination
-        v-model:current-page="groupPage"
-        :page-size="pageSize"
-        :total="groupTotal"
-        layout="prev, pager, next"
-        class="pager"
-        @current-change="loadGroups"
-      />
+      <ListPager v-model:page="groupPage" v-model:size="groupSize" :total="groupTotal" @change="loadGroups" />
     </section>
 
-    <section v-else class="panel">
-      <div class="filter-row">
-        <el-input v-model="newWord" placeholder="新增特殊词" style="width: 220px" clearable />
-        <el-button type="primary" :loading="saving" @click="handleAddWord">添加</el-button>
-      </div>
-      <el-table v-loading="loading" :data="wordList" size="small" empty-text="暂无特殊词">
-        <el-table-column prop="wordId" label="ID" width="70" />
-        <el-table-column prop="word" label="特殊词" min-width="140" />
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.enabled === 1 ? 'success' : 'info'" size="small">
-              {{ row.enabled === 1 ? '启用' : '停用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180">
-          <template #default="{ row }">
-            <el-button
-              link
-              size="small"
-              @click="toggleWord(row)"
-            >
-              {{ row.enabled === 1 ? '停用' : '启用' }}
-            </el-button>
-            <el-button link size="small" type="danger" @click="handleDeleteWord(row.wordId)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </section>
+    <section v-else class="panel"><SharedWordLibrary /></section>
 
     <!-- 特殊词监视 FAB -->
     <button type="button" class="monitor-fab" @click="openMonitor">
@@ -221,19 +179,14 @@
         </article>
         <p v-if="!monitorLoading && !violationList.length" class="empty-tip">暂无命中记录</p>
       </div>
-      <el-pagination
-        v-model:current-page="violationPage"
-        :page-size="pageSize"
-        :total="violationTotal"
-        layout="prev, pager, next"
-        class="pager"
-        @current-change="loadViolations"
-      />
+      <ListPager v-model:page="violationPage" v-model:size="violationSize" :total="violationTotal" @change="loadViolations" />
     </el-drawer>
   </div>
 </template>
 
 <script setup>
+import ListPager from "@/components/ListPager.vue"
+import SharedWordLibrary from "@/components/SharedWordLibrary.vue"
 import { onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -246,10 +199,6 @@ import {
   banGroup,
   unbanGroup,
   softDeleteGroup,
-  fetchSpecialWords,
-  addSpecialWord,
-  enableSpecialWord,
-  deleteSpecialWord,
   fetchSpecialWordViolations,
   handleSpecialWordViolation,
 } from '@/api/admin'
@@ -257,7 +206,7 @@ import {
 const activeTab = ref('chat')
 const loading = ref(false)
 const saving = ref(false)
-const pageSize = 10
+const chatSize=ref(20),groupSize=ref(20),violationSize=ref(20)
 
 const chatFilter = ref('')
 const chatPage = ref(1)
@@ -268,8 +217,6 @@ const groupPage = ref(1)
 const groupTotal = ref(0)
 const groupList = ref([])
 
-const wordList = ref([])
-const newWord = ref('')
 
 const editVisible = ref(false)
 const editContent = ref('')
@@ -314,7 +261,7 @@ async function loadChats() {
   loading.value = true
   try {
     const filter = chatFilter.value === '' ? null : Number(chatFilter.value)
-    const res = await fetchChatRecords(chatPage.value, pageSize, filter)
+    const res = await fetchChatRecords(chatPage.value, chatSize.value, filter)
     chatList.value = pageList(res.data)
     chatTotal.value = res.data?.total || 0
   } catch {
@@ -327,23 +274,11 @@ async function loadChats() {
 async function loadGroups() {
   loading.value = true
   try {
-    const res = await fetchGroupList(groupPage.value, pageSize)
+    const res = await fetchGroupList(groupPage.value, groupSize.value)
     groupList.value = pageList(res.data)
     groupTotal.value = res.data?.total || 0
   } catch {
     groupList.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-async function loadWords() {
-  loading.value = true
-  try {
-    const res = await fetchSpecialWords()
-    wordList.value = res.data || []
-  } catch {
-    wordList.value = []
   } finally {
     loading.value = false
   }
@@ -364,7 +299,7 @@ async function loadViolations() {
     const status = violationStatus.value === 'all' || violationStatus.value === '' || violationStatus.value === null
       ? null
       : Number(violationStatus.value)
-    const res = await fetchSpecialWordViolations(status, violationPage.value, pageSize)
+    const res = await fetchSpecialWordViolations(status, violationPage.value, violationSize.value)
     violationList.value = pageList(res.data)
     violationTotal.value = res.data?.total || 0
     pendingCount.value = res.data?.pendingCount ?? pendingCount.value
@@ -378,7 +313,6 @@ async function loadViolations() {
 function onTabChange(tab) {
   if (tab === 'chat') loadChats()
   else if (tab === 'group') loadGroups()
-  else loadWords()
 }
 
 function onChatFilterChange() {
@@ -478,45 +412,6 @@ async function handleSoftDelete(groupId) {
   }
 }
 
-async function handleAddWord() {
-  if (!newWord.value.trim()) {
-    ElMessage.warning('请输入特殊词')
-    return
-  }
-  saving.value = true
-  try {
-    await addSpecialWord({ word: newWord.value.trim(), enabled: 1 })
-    ElMessage.success('已添加')
-    newWord.value = ''
-    await loadWords()
-  } catch {
-    // handled
-  } finally {
-    saving.value = false
-  }
-}
-
-async function toggleWord(row) {
-  try {
-    await enableSpecialWord(row.wordId, row.enabled === 1 ? 0 : 1)
-    ElMessage.success('已更新')
-    await loadWords()
-  } catch {
-    // handled
-  }
-}
-
-async function handleDeleteWord(wordId) {
-  try {
-    await ElMessageBox.confirm('确定删除该特殊词？', '删除确认', { type: 'warning' })
-    await deleteSpecialWord(wordId)
-    ElMessage.success('已删除')
-    await loadWords()
-  } catch {
-    // cancel
-  }
-}
-
 function openMonitor() {
   monitorVisible.value = true
   violationPage.value = 1
@@ -573,13 +468,18 @@ async function handleViolation(item, action) {
   }
 }
 
+function refreshSharedWords() {
+}
+
 onMounted(() => {
+  window.addEventListener('focus', refreshSharedWords)
   loadChats()
   refreshPendingCount()
   pollTimer = setInterval(refreshPendingCount, 30000)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('focus', refreshSharedWords)
   if (pollTimer) clearInterval(pollTimer)
 })
 </script>

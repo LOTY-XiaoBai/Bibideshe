@@ -66,7 +66,7 @@ class SecurityRegressionTests {
         GroupUserMapper groupUserMapper = mock(GroupUserMapper.class);
         GroupAdminMapper groupAdminMapper = mock(GroupAdminMapper.class);
         GroupService service = new GroupService(groupChatMapper, groupUserMapper, groupAdminMapper,
-                mock(SocialUserService.class));
+                mock(SocialUserService.class),mock(com.example.bishe.service.AdminOperationService.class));
         long groupId = 30001L;
         long operatorId = 10001L;
         long targetId = 10002L;
@@ -89,7 +89,7 @@ class SecurityRegressionTests {
         GroupUserMapper groupUserMapper = mock(GroupUserMapper.class);
         GroupAdminMapper groupAdminMapper = mock(GroupAdminMapper.class);
         GroupService service = new GroupService(groupChatMapper, groupUserMapper, groupAdminMapper,
-                mock(SocialUserService.class));
+                mock(SocialUserService.class),mock(com.example.bishe.service.AdminOperationService.class));
         long groupId = 30001L;
         long operatorId = 10001L;
         long targetId = 10002L;
