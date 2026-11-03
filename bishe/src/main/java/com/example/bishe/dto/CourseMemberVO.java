@@ -15,6 +15,7 @@ public class CourseMemberVO {
     private Long studentId;
 
     private String nickname;
+    private String avatar;
 
     private BigDecimal studentScore;
 }

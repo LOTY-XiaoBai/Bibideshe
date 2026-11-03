@@ -6,6 +6,7 @@ let client = null
 const privateHandlers = new Set()
 const groupHandlers = new Map()
 const subscribedGroups = new Map()
+const connectionHandlers = new Set()
 
 function notifyPrivate(payload) {
   privateHandlers.forEach((fn) => {
@@ -67,6 +68,7 @@ export function connectChatWs() {
         }
       })
       client.subscribe('/user/queue/chat-ack', () => {})
+      connectionHandlers.forEach(fn => { try { fn() } catch (e) { console.error('[ws] connection handler', e) } })
       // 重连后恢复群主题订阅
       subscribedGroups.forEach((_, groupId) => {
         ensureGroupTopic(groupId)
@@ -79,6 +81,13 @@ export function connectChatWs() {
 
   client.activate()
   return client
+}
+
+export function onChatConnected(handler) {
+  connectionHandlers.add(handler)
+  connectChatWs()
+  if (client?.connected) handler()
+  return () => connectionHandlers.delete(handler)
 }
 
 function ensureGroupTopic(groupId) {
@@ -126,6 +135,7 @@ export function watchGroups(groupIds = []) {
 }
 
 export function disconnectChatWs() {
+  connectionHandlers.clear()
   privateHandlers.clear()
   groupHandlers.clear()
   subscribedGroups.forEach((sub) => sub?.unsubscribe?.())

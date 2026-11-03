@@ -110,9 +110,27 @@ public class CourseController {
     @PostMapping("/join")
     public Result<Void> join(@RequestBody CourseEnrollRequest request) {
         Long studentId = AuthContext.requireStudentId();
-        courseService.joinCourse(studentId, request.getCourseId());
-        return Result.success("选课成功", null);
+        return Result.success(courseService.joinCourse(studentId, request.getCourseId()), null);
     }
+
+    @GetMapping("/applications/teacher")
+    public Result<?> teacherApplications() {
+        return Result.success(courseService.applications(AuthContext.requireTeacherId(), true));
+    }
+
+    @GetMapping("/applications/student")
+    public Result<?> studentApplications() {
+        return Result.success(courseService.applications(AuthContext.requireStudentId(), false));
+    }
+
+    @PostMapping("/applications/review")
+    public Result<?> reviewApplication(@RequestBody ApplicationReview request) {
+        if (request.approve() == null) throw new com.example.bishe.common.BusinessException("请选择审核结果");
+        courseService.reviewApplication(AuthContext.requireTeacherId(), request.courseId(), request.studentId(), request.approve());
+        return Result.success(null);
+    }
+
+    public record ApplicationReview(Long courseId, Long studentId, Boolean approve) {}
 
     /** 学生退出班级(退课) */
     @PostMapping("/leave")

@@ -28,7 +28,7 @@ docker compose --env-file .env.demo --project-name bishe-demo down
 
 不要额外加 `-v`，该参数会删除演示数据库等数据卷。
 
-## 项目里保留的 7 个 SQL 都参与自动启动
+## 项目里保留的 9 个 SQL 都参与自动启动
 
 它们是程序运行所需的建表/迁移代码，**不是数据库数据备份，需要提交到 Git**。
 
@@ -41,10 +41,12 @@ docker compose --env-file .env.demo --project-name bishe-demo down
 | `bishe/sql/11_community_management.sql` | 管理操作日志、好友建立时间和词库合并 |
 | `bishe/sql/12_navigation_appeals.sql` | 警告衰减、申诉和聊天已读游标 |
 | `bishe/sql/13_direct_moderation_appeals.sql` | 管理员直接处置帖子的申诉支持 |
+| `bishe/sql/14_course_classroom.sql` | 固定课表、审批和容量设置、入课申请与课堂会话 |
+| `bishe/sql/15_course_query_indexes.sql` | 旧库课程、选课、签到、申请及在线课堂查询索引优化 |
 
 `07` 文件名里的 `manual` 是历史命名，现在也由程序自动执行；保留原文件名是为了兼容已经记录的迁移版本。编号有间隔正常，已经合并或被替代的旧脚本已清理，不需要补回。
 
-后端的 `DatabaseInitializer` 按顺序执行这些文件，并通过 `app_schema_migration` 记录已完成版本，后续启动不重复执行。Maven 将 SQL 打包进后端，Docker 构建也会带上它们。不能把这 7 个文件当成无用备份删除，否则首次部署或数据库升级会失败。
+后端的 `DatabaseInitializer` 按顺序执行这些文件，并通过 `app_schema_migration` 记录已完成版本，后续启动不重复执行。Maven 将 SQL 打包进后端，Docker 构建也会带上它们。不能把这 9 个文件当成无用备份删除，否则首次部署或数据库升级会失败。
 
 Navicat 只是连接 MySQL 的客户端，界面里看到的是 MySQL 中实际保存的表和数据。项目 SQL 是创建或升级这些表的指令，与 Navicat 不自动同步。当前受控 SQL 只含表结构、通用预置词和迁移逻辑，不含原作者的业务数据。
 
@@ -73,6 +75,12 @@ Navicat 只是连接 MySQL 的客户端，界面里看到的是 MySQL 中实际�
    ```
 
 本机开发默认前端 `http://localhost:5173`，后端 `http://localhost:8080`。
+
+## 网络授课运行条件
+
+摄像头、麦克风和屏幕共享需要 HTTPS 或 localhost。教师在“我的授课 → 上课”中选择授课方式，开启设备后点击“开始上课”；学生确认通知后进入直播间。教师离开课堂时结束本次上课，浏览器意外关闭后课堂心跳在 60 秒后失效。固定课表按 Asia/Shanghai 时区提前 5 分钟提醒在线教师。
+
+直播采用 WebRTC 点对点传输。局域网可直接连接；跨受限网络时在 `.env` 中填写 `RTC_TURN_URL`、`RTC_TURN_USERNAME`、`RTC_TURN_CREDENTIAL`，Docker 配置已透传这些变量。教师上行带宽随观看人数增加。
 
 ## 检查命令
 

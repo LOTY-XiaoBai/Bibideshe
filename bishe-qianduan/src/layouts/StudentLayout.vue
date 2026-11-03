@@ -24,7 +24,7 @@
           class="nav-item"
           active-class="is-active"
         >
-          <i :class="item.icon" />
+          <i aria-hidden="true" :class="item.icon" />
           <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
 
@@ -36,8 +36,8 @@
           class="nav-item"
           active-class="is-active"
         >
-          <i :class="item.icon" />
-          <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
+          <i aria-hidden="true" :class="item.icon" />
+          <span>{{ item.label }}</span><span v-if="item.path === '/student/check-in' && classroom.hasPending" class="checkin-dot" aria-label="有待完成的签到" /><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
 
         <div class="nav-group-title">生态服务</div>
@@ -48,7 +48,7 @@
           class="nav-item"
           active-class="is-active"
         >
-          <i :class="item.icon" />
+          <i aria-hidden="true" :class="item.icon" />
           <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
       </nav>
@@ -77,6 +77,8 @@
 </template>
 
 <script setup>
+import { useClassroomNotifications } from '@/stores/classroom'
+const classroom = useClassroomNotifications()
 import CountBadge from '@/components/CountBadge.vue'
 import { useUnread } from '@/stores/unread'
 const unread = useUnread()
@@ -102,7 +104,8 @@ const mainMenus = [
 ]
 
 const studyMenus = [
-  { path: '/student/tasks', label: '考试，作业，签到', icon: 'ph ph-pencil-simple-line' },
+  { path: '/student/tasks', label: '考试/作业', icon: 'ph ph-pencil-simple-line' },
+  { path: '/student/check-in', label: '签到', icon: 'ph ph-calendar-check' },
   { path: '/student/error-book', label: '我的错题本', icon: 'ph ph-notebook' },
 ]
 
@@ -142,6 +145,7 @@ function handleLogout() {
 </script>
 
 <style scoped>
+.checkin-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-left: auto; }
 .app-shell {
   display: flex;
   height: 100%;

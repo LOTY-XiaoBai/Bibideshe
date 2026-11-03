@@ -11,7 +11,7 @@
         :disabled="activeCount >= 3"
         @click="openCreate"
       >
-        <i class="ph ph-plus-circle" />
+        <i aria-hidden="true" class="ph ph-plus-circle" />
         创建新课程
       </el-button>
     </header>
@@ -47,9 +47,15 @@
                 {{ course.isFinished === 1 ? '已结课' : '进行中' }}
               </el-tag>
             </div>
-            <p>课程号：{{ course.courseId }}（可分享给学生选课）</p>
+            <p>课程号：{{ course.courseId }}</p>
+            <div class="course-meta">
+              <el-tag v-if="course.fixedSchedule" type="info" size="small">每周{{ weekdays[course.classWeekday - 1] }} {{ course.classTime }}</el-tag>
+              <el-tag v-if="course.approvalRequired" type="warning" size="small">加入需申请</el-tag>
+              <el-tag v-if="course.maxStudents" type="info" size="small">限 {{ course.maxStudents }} 人</el-tag>
+            </div>
           </div>
           <div class="ops">
+            <el-button v-if="course.isFinished !== 1" size="small" type="primary" @click="openClass(course)">上课</el-button>
             <el-button size="small" @click="openMembers(course)">班级成员</el-button>
             <el-button
               v-if="course.isFinished !== 1"
@@ -77,8 +83,24 @@
       </article>
     </div>
 
-    <el-dialog v-model="createVisible" title="创建新课程" width="420px" align-center>
-      <el-form @submit.prevent>
+    <section class="application-panel">
+      <div class="title-row"><h3>入课申请</h3><el-tag size="small">{{ applications.length }} 条待处理</el-tag><el-button text @click="loadApplications">刷新</el-button></div>
+      <el-table :data="applications" empty-text="暂无待处理的入课申请">
+        <el-table-column prop="courseName" label="申请课程" min-width="140" />
+        <el-table-column label="学生" min-width="150"><template #default="{ row }"><div class="applicant"><el-avatar :src="row.avatar" :size="30">{{ row.nickname?.slice(0, 1) }}</el-avatar><span>{{ row.nickname }} · {{ row.studentId }}</span></div></template></el-table-column>
+        <el-table-column label="操作" width="160"><template #default="{ row }"><el-button type="primary" link :disabled="reviewing" @click="handleReview(row, true)">通过</el-button><el-button type="danger" link :disabled="reviewing" @click="handleReview(row, false)">拒绝</el-button></template></el-table-column>
+      </el-table>
+    </section>
+
+    <el-dialog v-model="classVisible" title="选择授课方式" width="460px" align-center>
+      <div class="class-options">
+        <button @click="enterClass('ONLINE')"><i class="ph ph-video-camera" /><strong>网络授课</strong><span>摄像头、屏幕共享与麦克风直播</span></button>
+        <button @click="enterClass('LOCAL')"><i class="ph ph-chalkboard-teacher" /><strong>本地授课</strong><span>线下课堂，发布签到与随机点名</span></button>
+      </div>
+    </el-dialog>
+
+    <el-dialog v-model="createVisible" title="创建新课程" width="min(520px, 94vw)" align-center>
+      <el-form label-position="top" @submit.prevent>
         <el-form-item label="课程名称">
           <el-input
             v-model="createName"
@@ -87,6 +109,18 @@
             placeholder="例如：高等数学 A"
           />
         </el-form-item>
+        <div class="setting-block">
+          <el-checkbox v-model="createSettings.fixedSchedule">固定授课时间</el-checkbox>
+          <div v-if="createSettings.fixedSchedule" class="schedule-row">
+            <el-select v-model="createSettings.classWeekday" placeholder="选择星期"><el-option v-for="(day, i) in weekdays" :key="i" :value="i + 1" :label="`星期${day}`" /></el-select>
+            <el-time-picker v-model="createSettings.classTime" format="HH:mm" value-format="HH:mm" placeholder="选择上课时间" />
+          </div>
+        </div>
+        <div class="setting-block"><el-checkbox v-model="createSettings.approvalRequired">学生加入课程需要申请</el-checkbox></div>
+        <div class="setting-block">
+          <el-checkbox v-model="limitEnabled">限制课堂人数</el-checkbox>
+          <div v-if="limitEnabled" class="schedule-row"><el-input-number v-model="createSettings.maxStudents" :min="1" :max="10000" :precision="0" /><span>人（课程最大人数）</span></div>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="createVisible = false">取消</el-button>
@@ -125,7 +159,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { activeClass, fetchApplications, reviewApplication } from '@/api/classroom'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createCourse,
@@ -146,6 +182,28 @@ const createName = ref('')
 const membersVisible = ref(false)
 const currentCourse = ref(null)
 const members = ref([])
+const router = useRouter()
+const weekdays = ['一', '二', '三', '四', '五', '六', '日']
+const createSettings = reactive({ fixedSchedule: false, classWeekday: 1, classTime: '', approvalRequired: false, maxStudents: 50 })
+const limitEnabled = ref(false)
+const applications = ref([])
+const reviewing = ref(false)
+const classVisible = ref(false)
+const classCourse = ref(null)
+
+async function loadApplications() { try { applications.value = (await fetchApplications('teacher')).data || [] } catch {} }
+async function handleReview(row, approve) {
+  reviewing.value = true
+  try { await reviewApplication(row.courseId, row.studentId, approve); ElMessage.success(approve ? '已通过入课申请' : '已拒绝申请'); await loadApplications() } catch {} finally { reviewing.value = false }
+}
+async function openClass(course) {
+  try {
+    const { data } = await activeClass(course.courseId)
+    if (data) { router.push(`/teacher/classroom/${course.courseId}?session=${data.sessionId}`); return }
+    classCourse.value = course; classVisible.value = true
+  } catch {}
+}
+function enterClass(mode) { classVisible.value = false; router.push(`/teacher/classroom/${classCourse.value.courseId}?mode=${mode}`) }
 
 const activeCount = computed(
   () => courses.value.filter((c) => c.isFinished !== 1).length,
@@ -173,6 +231,8 @@ async function loadCourses() {
 
 function openCreate() {
   createName.value = ''
+  Object.assign(createSettings, { fixedSchedule: false, classWeekday: 1, classTime: '', approvalRequired: false, maxStudents: 50 })
+  limitEnabled.value = false
   createVisible.value = true
 }
 
@@ -184,7 +244,8 @@ async function handleCreate() {
   }
   creating.value = true
   try {
-    await createCourse({ courseName: name })
+    if (createSettings.fixedSchedule && !createSettings.classTime) { ElMessage.warning('请选择固定授课时间'); return }
+    await createCourse({ courseName: name, ...createSettings, maxStudents: limitEnabled.value ? createSettings.maxStudents : null })
     ElMessage.success('课程创建成功')
     createVisible.value = false
     await loadCourses()
@@ -264,10 +325,22 @@ async function handleRemove(row) {
   }
 }
 
-onMounted(loadCourses)
+let applicationTimer
+onMounted(() => { loadCourses(); loadApplications(); applicationTimer = setInterval(loadApplications, 15000) })
+onUnmounted(() => clearInterval(applicationTimer))
 </script>
 
 <style scoped>
+.course-meta, .schedule-row, .applicant { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.setting-block { padding: 12px 0; border-top: 1px solid #f0f2f5; }
+.schedule-row > * { min-width: 0; }
+.schedule-row .el-select { width: 140px; }
+.application-panel { background: white; padding: 22px; border: 1px solid #f3f4f6; border-radius: 16px; margin-top: 24px; }
+.class-options { display: grid; gap: 12px; }
+.class-options button { cursor: pointer; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 14px; padding: 22px; text-align: left; display: grid; gap: 8px; color: #334155; }
+.class-options button:hover { border-color: var(--brand-blue); background: #eef9ff; }
+.class-options i { font-size: 28px; color: var(--brand-blue); }
+.class-options span { color: #6b7280; font-size: 13px; }
 .page__header {
   display: flex;
   align-items: flex-start;

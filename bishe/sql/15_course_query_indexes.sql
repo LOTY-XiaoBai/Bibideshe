@@ -1,0 +1,25 @@
+-- 用于已有数据库的增量优化，检查索引名后执行，支持中断后重试。
+SET @ddl=IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='course' AND index_name='idx_course_teacher_status'),'SELECT 1','ALTER TABLE course ADD INDEX idx_course_teacher_status(teacher_id,is_finished)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+SET @ddl=IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='course_personnel' AND index_name='idx_personnel_student'),'SELECT 1','ALTER TABLE course_personnel ADD INDEX idx_personnel_student(student_id,course_id)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+SET @ddl=IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='check_in_user' AND index_name='idx_checkin_student_status'),'SELECT 1','ALTER TABLE check_in_user ADD INDEX idx_checkin_student_status(student_id,status,check_in_id)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+SET @ddl=IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='check_in_record' AND index_name='idx_checkin_course_status'),'SELECT 1','ALTER TABLE check_in_record ADD INDEX idx_checkin_course_status(course_id,status,deadline)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+SET @ddl=IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='course_application' AND index_name='idx_application_course_status'),'SELECT 1','ALTER TABLE course_application ADD INDEX idx_application_course_status(course_id,status,applied_at)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+SET @ddl=IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='course_session' AND index_name='idx_session_active'),'SELECT 1','ALTER TABLE course_session ADD INDEX idx_session_active(course_id,ended_at,heartbeat_at)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

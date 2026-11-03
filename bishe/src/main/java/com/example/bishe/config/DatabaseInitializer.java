@@ -23,7 +23,7 @@ public class DatabaseInitializer implements InitializingBean {
             }
             try {
                 try(var statement=connection.createStatement()){statement.execute("CREATE TABLE IF NOT EXISTS app_schema_migration(version VARCHAR(80) PRIMARY KEY,applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");}
-                for(String path:List.of("base/01_schema.sql","migrations/07_community_shop_profile_manual.sql","migrations/09_community_reply_likes.sql","migrations/10_community_safety.sql","migrations/11_community_management.sql","migrations/12_navigation_appeals.sql","migrations/13_direct_moderation_appeals.sql")){
+                for(String path:List.of("base/01_schema.sql","migrations/07_community_shop_profile_manual.sql","migrations/09_community_reply_likes.sql","migrations/10_community_safety.sql","migrations/11_community_management.sql","migrations/12_navigation_appeals.sql","migrations/13_direct_moderation_appeals.sql","migrations/14_course_classroom.sql","migrations/15_course_query_indexes.sql")){
                     String version="auto:"+path.substring(path.lastIndexOf('/')+1);
                     try(var check=connection.prepareStatement("SELECT COUNT(*) FROM app_schema_migration WHERE version=?")){
                         check.setString(1,version);try(var result=check.executeQuery()){result.next();if(result.getInt(1)>0)continue;}

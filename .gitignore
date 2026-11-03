@@ -17,6 +17,7 @@
 **/node_modules/
 **/dist/
 **/dist-ssr/
+/test-results/
 
 # IDE / OS
 **/.idea/

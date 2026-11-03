@@ -2,13 +2,14 @@
   <div class="page">
     <header class="page__header">
       <div>
-        <h2>考试与作业</h2>
-        <p>参加考试、提交作业，并完成课程签到</p>
+        <h2>{{ isCheckInPage ? '课程签到' : '考试与作业' }}</h2>
+        <p>{{ isCheckInPage ? '完成课堂签到，查看签到和漏签记录' : '参加课程考试，完成并提交作业' }}</p>
       </div>
     </header>
 
     <div class="toolbar">
       <el-select v-model="selectedCourseId" placeholder="选择课程" style="width: 260px" @change="onCourseChange">
+        <el-option v-if="isCheckInPage" label="全部课程" :value="0" />
         <el-option
           v-for="c in courses"
           :key="c.courseId"
@@ -20,10 +21,9 @@
       <el-button text :loading="loading" @click="reloadAll">刷新</el-button>
     </div>
 
-    <el-tabs v-model="activeTab">
+    <el-tabs v-if="!isCheckInPage" v-model="activeTab">
       <el-tab-pane label="考试" name="exam" />
       <el-tab-pane label="作业" name="homework" />
-      <el-tab-pane label="签到" name="checkin" />
     </el-tabs>
 
     <!-- 考试 -->
@@ -228,7 +228,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useClassroomStore } from '@/stores/classroom'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { fetchStudentCourses } from '@/api/course'
@@ -257,7 +259,10 @@ import QuestionPaper from '@/components/QuestionPaper.vue'
 
 const userStore = useUserStore()
 
-const activeTab = ref('exam')
+const route = useRoute(), classroom = useClassroomStore()
+const isCheckInPage = computed(() => route.path === '/student/check-in')
+const activeTab = ref(isCheckInPage.value ? 'checkin' : 'exam')
+watch(isCheckInPage, value => { activeTab.value = value ? 'checkin' : 'exam'; if (value) { selectedCourseId.value = 0; loadCheckinData() } })
 const checkinSubTab = ref('active')
 const loading = ref(false)
 const checkinLoading = ref(false)
@@ -295,9 +300,7 @@ const reviewItems = ref([])
 const reviewSummary = ref(null)
 
 const activeCheckIns = computed(() =>
-  checkinRecords.value.filter(
-    (r) => Number(r.checkInStatus) === 0 && Number(r.status) === 0,
-  ),
+  classroom.checkIns.filter(r => !selectedCourseId.value || String(r.courseId) === String(selectedCourseId.value)),
 )
 
 function formatScore(v) {
@@ -345,7 +348,7 @@ function answerKey(q) {
 async function loadCourses() {
   const res = await fetchStudentCourses()
   courses.value = res.data || []
-  if (!selectedCourseId.value && courses.value.length) {
+  if (!isCheckInPage.value && !selectedCourseId.value && courses.value.length) {
     const active = courses.value.find((c) => c.isFinished !== 1)
     selectedCourseId.value = active?.courseId || courses.value[0].courseId
   }
@@ -567,6 +570,7 @@ async function handleSign(checkInId) {
   try {
     await signCheckIn(checkInId)
     ElMessage.success('签到成功')
+    await classroom.refresh()
     await loadCheckinData()
   } catch {
     // handled
@@ -575,8 +579,10 @@ async function handleSign(checkInId) {
   }
 }
 
-onMounted(reloadAll)
-onUnmounted(clearExamTimer)
+function refreshClassroom() { if (isCheckInPage.value) loadCheckinData() }
+let checkinTimer
+onMounted(() => { reloadAll(); classroom.refresh(); window.addEventListener('classroom-changed', refreshClassroom); checkinTimer = setInterval(refreshClassroom, 15000) })
+onUnmounted(() => { clearExamTimer(); clearInterval(checkinTimer); window.removeEventListener('classroom-changed', refreshClassroom) })
 </script>
 
 <style scoped>

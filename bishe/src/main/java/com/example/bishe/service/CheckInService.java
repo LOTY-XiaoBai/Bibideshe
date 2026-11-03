@@ -48,17 +48,19 @@ public class CheckInService {
     private final CourseMapper courseMapper;
     private final CoursePersonnelMapper coursePersonnelMapper;
     private final CourseService courseService;
+    private final ClassroomService classroom;
 
     public CheckInService(CheckInRecordMapper checkInRecordMapper,
                           CheckInUserMapper checkInUserMapper,
                           CourseMapper courseMapper,
                           CoursePersonnelMapper coursePersonnelMapper,
-                          CourseService courseService) {
+                          CourseService courseService, ClassroomService classroom) {
         this.checkInRecordMapper = checkInRecordMapper;
         this.checkInUserMapper = checkInUserMapper;
         this.courseMapper = courseMapper;
         this.coursePersonnelMapper = coursePersonnelMapper;
         this.courseService = courseService;
+        this.classroom = classroom;
     }
 
     // ==================== 教师端 ====================
@@ -83,9 +85,13 @@ public class CheckInService {
         }
 
         // 校验课程归属
+        courseMapper.findByIdForUpdate(request.getCourseId());
         Course course = requireOwnedCourse(request.getTeacherId(), request.getCourseId());
         if (course.getIsFinished() != null && course.getIsFinished() == 1) {
             throw new BusinessException("课程已结束, 无法发布签到");
+        }
+        if (classroom.active(request.getCourseId()) == null) {
+            throw new BusinessException("请先开始上课，再发布签到");
         }
 
         // 获取课程下所有学生
@@ -118,7 +124,7 @@ public class CheckInService {
 
         // 发布后刷新课程成绩(缺勤暂不计分, 但总分母已变化)
         refreshCourseScores(request.getCourseId(), students);
-
+        classroom.broadcast(request.getCourseId(), "CHECK_IN_PUBLISHED", Map.of("courseId", request.getCourseId(), "checkInId", record.getCheckInId(), "courseName", course.getCourseName()));
         return record;
     }
 
@@ -425,7 +431,8 @@ public class CheckInService {
         if (record.getStatus() != null && record.getStatus() == CHECK_IN_ENDED) {
             return;
         }
-        if (record.getDeadline() != null && LocalDateTime.now().isAfter(record.getDeadline())) {
+        if ((record.getDeadline() != null && LocalDateTime.now().isAfter(record.getDeadline()))
+                || classroom.active(record.getCourseId()) == null) {
             checkInRecordMapper.endCheckIn(record.getCheckInId(), LocalDateTime.now());
             record.setStatus(CHECK_IN_ENDED);
         }

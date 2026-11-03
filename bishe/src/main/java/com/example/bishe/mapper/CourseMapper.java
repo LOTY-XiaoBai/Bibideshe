@@ -17,6 +17,7 @@ public interface CourseMapper {
 
     /** 按课程ID查询课程 */
     Course findById(Long courseId);
+    Course findByIdForUpdate(Long courseId);
 
     /** 按课程ID列表批量查询 */
     List<Course> findByIds(@Param("ids") List<Long> ids);

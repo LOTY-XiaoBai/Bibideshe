@@ -13,4 +13,9 @@ public class CourseCreateRequest {
 
     /** 课程名字 */
     private String courseName;
+    private Boolean fixedSchedule;
+    private Integer classWeekday;
+    private String classTime;
+    private Boolean approvalRequired;
+    private Integer maxStudents;
 }

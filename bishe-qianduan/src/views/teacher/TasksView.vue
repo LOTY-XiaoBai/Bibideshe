@@ -2,8 +2,8 @@
   <div class="page">
     <header class="page__header">
       <div>
-        <h2>发布作业 / 考试 / 签到</h2>
-        <p>从题库组卷发布考核，或发起课程签到</p>
+        <h2>发布作业 / 考试</h2>
+        <p>从题库组卷，发布考试与作业</p>
       </div>
     </header>
 
@@ -22,7 +22,6 @@
     <el-tabs v-model="activeTab">
       <el-tab-pane label="发布考试" name="exam" />
       <el-tab-pane label="发布作业" name="homework" />
-      <el-tab-pane label="发布签到" name="checkin" />
     </el-tabs>
 
     <!-- 组卷区（考试/作业共用） -->
@@ -153,105 +152,6 @@
       </el-table>
     </section>
 
-    <!-- 签到 -->
-    <section v-else class="checkin-panel">
-      <el-form label-position="top" class="checkin-form">
-        <el-form-item label="签到截止时间">
-          <el-date-picker
-            v-model="checkinDeadline"
-            type="datetime"
-            placeholder="选择截止时间"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="本次签到分值">
-          <el-input-number v-model="checkinScore" :min="0.5" :max="100" :step="0.5" />
-        </el-form-item>
-        <el-button
-          type="primary"
-          :loading="publishing"
-          :disabled="!selectedCourseId"
-          @click="handlePublishCheckin"
-        >
-          发布签到
-        </el-button>
-      </el-form>
-
-      <div class="history-block">
-        <div class="history-head">
-          <h3>课程签到记录</h3>
-          <el-button text :loading="checkinLoading" @click="loadCheckinHistory">刷新</el-button>
-        </div>
-        <el-table v-loading="checkinLoading" :data="checkinHistory" size="small" empty-text="暂无签到">
-          <el-table-column prop="checkInId" label="签到号" width="80" />
-          <el-table-column label="发布时间" min-width="140">
-            <template #default="{ row }">{{ formatTime(row.publishTime) }}</template>
-          </el-table-column>
-          <el-table-column label="截止时间" min-width="140">
-            <template #default="{ row }">{{ formatTime(row.deadline) }}</template>
-          </el-table-column>
-          <el-table-column prop="attendeeCount" label="已签人数" width="90" />
-          <el-table-column label="状态" width="90">
-            <template #default="{ row }">
-              <el-tag :type="row.status === 1 ? 'info' : 'success'" size="small">
-                {{ row.status === 1 ? '已结束' : '进行中' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="200">
-            <template #default="{ row }">
-              <el-button size="small" link @click="viewCheckinDetail(row)">详情</el-button>
-              <el-button size="small" link @click="viewAbsent(row)">漏签</el-button>
-              <el-button
-                v-if="row.status !== 1"
-                size="small"
-                link
-                type="danger"
-                @click="handleEndCheckin(row.checkInId)"
-              >
-                结束
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </section>
-
-    <el-dialog v-model="detailVisible" title="签到详情" width="640px" destroy-on-close>
-      <el-table :data="detailList" size="small" max-height="400">
-        <el-table-column prop="studentId" label="学生 ID" width="100" />
-        <el-table-column prop="studentNickname" label="昵称" />
-        <el-table-column label="签到时间" min-width="140">
-          <template #default="{ row }">{{ formatTime(row.checkInTime) || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-select
-              v-if="detailEnded"
-              :model-value="row.studentStatus"
-              size="small"
-              @change="(v) => updateStatus(row, v)"
-            >
-              <el-option :value="0" label="缺勤" />
-              <el-option :value="1" label="已签到" />
-              <el-option :value="2" label="迟到" />
-            </el-select>
-            <el-tag v-else :type="statusTag(row.studentStatus)" size="small">
-              {{ statusLabel(row.studentStatus) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
-
-    <el-dialog v-model="absentVisible" title="漏签学生" width="520px" destroy-on-close>
-      <el-table :data="absentList" size="small" empty-text="全员已签到">
-        <el-table-column prop="studentId" label="学生 ID" />
-        <el-table-column prop="studentNickname" label="昵称" />
-      </el-table>
-    </el-dialog>
-
     <el-dialog
       v-model="rankVisible"
       :title="rankTitle"
@@ -314,14 +214,6 @@ import {
   fetchHomeworkScores,
   reviewHomeworkForTeacher,
 } from '@/api/homework'
-import {
-  publishCheckIn,
-  endCheckIn,
-  fetchCourseCheckIns,
-  fetchCheckInDetail,
-  fetchAbsentStudents,
-  updateCheckInStatus,
-} from '@/api/checkIn'
 import { questionTypeLabel } from '@/utils/question'
 import QuestionPaper from '@/components/QuestionPaper.vue'
 
@@ -338,20 +230,9 @@ const selectedQuestions = ref([])
 const examTimeLimit = ref(60)
 const homeworkDeadline = ref('')
 const hideResultUntilPublish = ref(0)
-const checkinDeadline = ref('')
-const checkinScore = ref(1)
 const publishing = ref(false)
 const publishedLoading = ref(false)
 const publishedList = ref([])
-
-const checkinLoading = ref(false)
-const checkinHistory = ref([])
-const detailVisible = ref(false)
-const detailList = ref([])
-const detailEnded = ref(false)
-const currentCheckInId = ref(null)
-const absentVisible = ref(false)
-const absentList = ref([])
 
 const rankVisible = ref(false)
 const rankLoading = ref(false)
@@ -374,18 +255,6 @@ const filteredBank = computed(() => {
 function formatTime(t) {
   if (!t) return '-'
   return String(t).replace('T', ' ').slice(0, 16)
-}
-
-function statusLabel(s) {
-  if (s === 1) return '已签到'
-  if (s === 2) return '迟到'
-  return '缺勤'
-}
-
-function statusTag(s) {
-  if (s === 1) return 'success'
-  if (s === 2) return 'warning'
-  return 'danger'
 }
 
 async function loadCourses() {
@@ -477,99 +346,12 @@ async function handlePublish() {
   }
 }
 
-async function handlePublishCheckin() {
-  if (!selectedCourseId.value) {
-    ElMessage.warning('请选择课程')
-    return
-  }
-  if (!checkinDeadline.value) {
-    ElMessage.warning('请设置签到截止时间')
-    return
-  }
-  publishing.value = true
-  try {
-    await publishCheckIn({
-      courseId: selectedCourseId.value,
-      deadline: checkinDeadline.value,
-      scoreValue: checkinScore.value,
-    })
-    ElMessage.success('签到发布成功')
-    await loadCheckinHistory()
-  } catch {
-    // handled
-  } finally {
-    publishing.value = false
-  }
-}
-
-async function loadCheckinHistory() {
-  if (!selectedCourseId.value) return
-  checkinLoading.value = true
-  try {
-    const res = await fetchCourseCheckIns(selectedCourseId.value, 1, 50)
-    checkinHistory.value = res.data?.records || []
-  } catch {
-    checkinHistory.value = []
-  } finally {
-    checkinLoading.value = false
-  }
-}
-
-async function viewCheckinDetail(row) {
-  currentCheckInId.value = row.checkInId
-  detailEnded.value = row.status === 1
-  try {
-    const res = await fetchCheckInDetail(row.checkInId)
-    detailList.value = res.data || []
-    detailVisible.value = true
-  } catch {
-    // handled
-  }
-}
-
-async function viewAbsent(row) {
-  try {
-    const res = await fetchAbsentStudents(row.checkInId)
-    absentList.value = res.data || []
-    absentVisible.value = true
-  } catch {
-    // handled
-  }
-}
-
-async function handleEndCheckin(checkInId) {
-  try {
-    await ElMessageBox.confirm('确定结束此次签到？', '结束确认', { type: 'warning' })
-    await endCheckIn(checkInId)
-    ElMessage.success('签到已结束')
-    await loadCheckinHistory()
-  } catch {
-    // cancel
-  }
-}
-
-async function updateStatus(row, status) {
-  try {
-    await updateCheckInStatus({
-      checkInId: currentCheckInId.value,
-      studentId: row.studentId,
-      status,
-    })
-    ElMessage.success('状态已更新')
-    row.studentStatus = status
-  } catch {
-    // handled
-  }
-}
-
 watch(selectedCourseId, () => {
-  if (activeTab.value === 'checkin') loadCheckinHistory()
   if (activeTab.value === 'exam' || activeTab.value === 'homework') loadPublishedList()
 })
 
 watch(activeTab, (tab) => {
   selectedQuestions.value = []
-  if (tab === 'checkin') loadCheckinHistory()
   if (tab === 'exam' || tab === 'homework') loadPublishedList()
 })
 
@@ -659,7 +441,6 @@ async function openStudentReview(row) {
 onMounted(async () => {
   await loadCourses()
   await loadQuestionBank()
-  if (activeTab.value === 'checkin') await loadCheckinHistory()
   if (activeTab.value === 'exam' || activeTab.value === 'homework') await loadPublishedList()
 })
 </script>
@@ -754,20 +535,6 @@ onMounted(async () => {
   border: none !important;
 }
 
-.checkin-panel {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 16px;
-}
-
-.checkin-form,
-.history-block {
-  padding: 16px;
-  border-radius: 16px;
-  background: #fff;
-  border: 1px solid #f3f4f6;
-}
-
 .history-head {
   display: flex;
   align-items: center;
@@ -808,8 +575,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 960px) {
-  .publish-panel,
-  .checkin-panel {
+  .publish-panel {
     grid-template-columns: 1fr;
   }
 }

@@ -24,7 +24,7 @@
           class="nav-item"
           active-class="is-active"
         >
-          <i :class="item.icon" />
+          <i aria-hidden="true" :class="item.icon" />
           <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
 
@@ -36,7 +36,7 @@
           class="nav-item"
           active-class="is-active"
         >
-          <i :class="item.icon" />
+          <i aria-hidden="true" :class="item.icon" />
           <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
 
@@ -48,7 +48,7 @@
           class="nav-item"
           active-class="is-active"
         >
-          <i :class="item.icon" />
+          <i aria-hidden="true" :class="item.icon" />
           <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
         </RouterLink>
       </nav>
@@ -72,6 +72,8 @@
 </template>
 
 <script setup>
+import { useClassroomNotifications } from '@/stores/classroom'
+useClassroomNotifications()
 import CountBadge from '@/components/CountBadge.vue'
 import { useUnread } from '@/stores/unread'
 const unread = useUnread()

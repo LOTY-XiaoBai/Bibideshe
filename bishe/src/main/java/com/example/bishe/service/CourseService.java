@@ -14,6 +14,7 @@ import com.example.bishe.mapper.TeacherMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -41,17 +42,21 @@ public class CourseService {
     private final TeacherMapper teacherMapper;
     private final StudentMapper studentMapper;
     private final CascadeMapper cascadeMapper;
+    private final JdbcTemplate jdbc;
+    private final ClassroomService classroom;
 
     public CourseService(CourseMapper courseMapper,
                          CoursePersonnelMapper coursePersonnelMapper,
                          TeacherMapper teacherMapper,
                          StudentMapper studentMapper,
-                         CascadeMapper cascadeMapper) {
+                         CascadeMapper cascadeMapper, JdbcTemplate jdbc, ClassroomService classroom) {
         this.courseMapper = courseMapper;
         this.coursePersonnelMapper = coursePersonnelMapper;
         this.teacherMapper = teacherMapper;
         this.studentMapper = studentMapper;
         this.cascadeMapper = cascadeMapper;
+        this.jdbc = jdbc;
+        this.classroom = classroom;
     }
 
     // ==================== 教师端 ====================
@@ -77,7 +82,23 @@ public class CourseService {
 
         Course course = new Course();
         course.setTeacherId(request.getTeacherId());
-        course.setCourseName(request.getCourseName());
+        String name = request.getCourseName().trim();
+        if (name.length() > 100) throw new BusinessException("课程名称不能超过100字");
+        course.setCourseName(name);
+        course.setFixedSchedule(Boolean.TRUE.equals(request.getFixedSchedule()));
+        if (Boolean.TRUE.equals(request.getFixedSchedule())) {
+            if (request.getClassWeekday() == null || request.getClassWeekday() < 1 || request.getClassWeekday() > 7
+                    || request.getClassTime() == null || !request.getClassTime().matches("([01]\\d|2[0-3]):[0-5]\\d")) {
+                throw new BusinessException("请选择固定授课的星期和时间");
+            }
+            course.setClassWeekday(request.getClassWeekday());
+            course.setClassTime(request.getClassTime());
+        }
+        course.setApprovalRequired(Boolean.TRUE.equals(request.getApprovalRequired()));
+        if (request.getMaxStudents() != null && (request.getMaxStudents() < 1 || request.getMaxStudents() > 10000)) {
+            throw new BusinessException("课堂人数上限应为1至10000人");
+        }
+        course.setMaxStudents(request.getMaxStudents());
         course.setIsFinished(NOT_FINISHED);
         courseMapper.insert(course);
 
@@ -90,11 +111,13 @@ public class CourseService {
      */
     @Transactional
     public void finishCourse(Long teacherId, Long courseId) {
+        courseMapper.findByIdForUpdate(courseId);
         Course course = requireOwnedCourse(teacherId, courseId);
         if (course.getIsFinished() != null && course.getIsFinished() == FINISHED) {
             throw new BusinessException("课程已经结束, 请勿重复操作");
         }
         courseMapper.updateFinished(courseId, FINISHED);
+        classroom.endForCourse(courseId);
         // 课程结课后重算所有学生的综合评分
         updateComprehensiveScoreForAllStudentsInCourse(courseId);
     }
@@ -159,14 +182,15 @@ public class CourseService {
      * 学生加入班级(选课)。防止重复选课。
      */
     @Transactional
-    public void joinCourse(Long studentId, Long courseId) {
+    public String joinCourse(Long studentId, Long courseId) {
         if (studentId == null || courseId == null) {
             throw new BusinessException("学生ID与课程号不能为空");
         }
+        Course course = courseMapper.findByIdForUpdate(courseId);
+        // 必须先获取课程锁，再建立一致性读快照，避免并发选课读到旧人数。
         if (studentMapper.findById(studentId) == null) {
             throw new BusinessException("学生不存在");
         }
-        Course course = courseMapper.findById(courseId);
         if (course == null) {
             throw new BusinessException("课程不存在");
         }
@@ -177,11 +201,50 @@ public class CourseService {
             throw new BusinessException("您已选修该课程, 请勿重复选课");
         }
 
+        requireCapacity(course);
+        if (Boolean.TRUE.equals(course.getApprovalRequired())) {
+            var status = jdbc.queryForList("SELECT status FROM course_application WHERE course_id=? AND student_id=?", String.class, courseId, studentId);
+            if (status.contains("PENDING")) throw new BusinessException("申请已提交，请等待教师审核");
+            jdbc.update("INSERT INTO course_application(course_id,student_id,status) VALUES(?,?,'PENDING') ON DUPLICATE KEY UPDATE status='PENDING',applied_at=CURRENT_TIMESTAMP,reviewed_at=NULL", courseId, studentId);
+            return "申请已提交，等待教师审核";
+        }
+        enroll(courseId, studentId);
+        return "选课成功";
+    }
+
+    private void requireCapacity(Course course) {
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM course_personnel WHERE course_id=?", Integer.class, course.getCourseId());
+        if (course.getMaxStudents() != null && count >= course.getMaxStudents()) throw new BusinessException("该课程人数已满");
+    }
+
+    private void enroll(Long courseId, Long studentId) {
         CoursePersonnel personnel = new CoursePersonnel();
         personnel.setCourseId(courseId);
         personnel.setStudentId(studentId);
         personnel.setStudentScore(BigDecimal.ZERO);
         coursePersonnelMapper.insert(personnel);
+    }
+
+    public List<Map<String, Object>> applications(Long userId, boolean teacher) {
+        String filter = teacher ? "c.teacher_id=? AND a.status='PENDING'" : "a.student_id=?";
+        return jdbc.queryForList("SELECT a.course_id AS courseId,a.student_id AS studentId,a.status,a.applied_at AS appliedAt,c.course_name AS courseName,s.nickname,s.avatar FROM course_application a JOIN course c ON c.course_id=a.course_id JOIN student s ON s.student_id=a.student_id WHERE " + filter + " ORDER BY a.applied_at DESC", userId);
+    }
+
+    @Transactional
+    public void reviewApplication(Long teacherId, Long courseId, Long studentId, boolean approve) {
+        courseMapper.findByIdForUpdate(courseId);
+        Course course = requireOwnedCourse(teacherId, courseId);
+        var statuses = jdbc.queryForList("SELECT status FROM course_application WHERE course_id=? AND student_id=?", String.class, courseId, studentId);
+        if (!statuses.contains("PENDING")) throw new BusinessException("该申请已处理或不存在");
+        if (approve) {
+            if (Integer.valueOf(1).equals(course.getIsFinished())) throw new BusinessException("课程已结束");
+            var student = studentMapper.findById(studentId);
+            if (student == null || Integer.valueOf(1).equals(student.getIsDeleted()) || Integer.valueOf(1).equals(student.getIsBanned())) throw new BusinessException("学生账号不可用");
+            requireCapacity(course);
+            if (coursePersonnelMapper.find(courseId, studentId) != null) throw new BusinessException("学生已加入课程");
+            enroll(courseId, studentId);
+        }
+        jdbc.update("UPDATE course_application SET status=?,reviewed_at=CURRENT_TIMESTAMP WHERE course_id=? AND student_id=?", approve ? "APPROVED" : "REJECTED", courseId, studentId);
     }
 
     /**
@@ -486,6 +549,10 @@ public class CourseService {
      */
     @Transactional
     public void deleteCourseCascade(Long courseId) {
+        courseMapper.findByIdForUpdate(courseId);
+        classroom.endForCourse(courseId);
+        jdbc.update("DELETE FROM course_application WHERE course_id=?", courseId);
+        jdbc.update("DELETE FROM course_session WHERE course_id=?", courseId);
         // 考试相关(先删依赖考试的明细, 再删考试)
         cascadeMapper.deleteExamAnswersByCourseId(courseId);
         cascadeMapper.deleteExamQuestionsByCourseId(courseId);

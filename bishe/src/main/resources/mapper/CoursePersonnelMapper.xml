@@ -28,6 +28,7 @@
             cp.course_id AS courseId,
             cp.student_id AS studentId,
             s.nickname AS nickname,
+            s.avatar AS avatar,
             cp.student_score AS studentScore
         FROM course_personnel cp
         LEFT JOIN student s ON cp.student_id = s.student_id

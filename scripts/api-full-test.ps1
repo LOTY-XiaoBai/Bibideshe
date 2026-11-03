@@ -503,6 +503,9 @@ Assert-Api "GET /api/homework/{id}/review" {
 } | Out-Null
 
 Write-Step "7. Check-in"
+$classroom = Assert-Api "POST /api/classroom/start" {
+    Invoke-Api -Method POST -Path "/api/classroom/start" -Token $teacherToken -Body @{ courseId = $courseId; mode = 'LOCAL' }
+}
 $ciDeadline = (Get-Date).AddHours(2).ToString("yyyy-MM-ddTHH:mm:ss")
 $ci = Assert-Api "POST /api/check-in/publish" {
     Invoke-Api -Method POST -Path "/api/check-in/publish" -Token $teacherToken -Body @{

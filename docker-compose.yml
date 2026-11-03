@@ -59,6 +59,10 @@ services:
       CAPTCHA_EXPOSE_CODE: ${CAPTCHA_EXPOSE_CODE:-false}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      RTC_STUN_URL: ${RTC_STUN_URL:-stun:stun.l.google.com:19302}
+      RTC_TURN_URL: ${RTC_TURN_URL:-}
+      RTC_TURN_USERNAME: ${RTC_TURN_USERNAME:-}
+      RTC_TURN_CREDENTIAL: ${RTC_TURN_CREDENTIAL:-}
       SERVER_PORT: 8080
       UPLOAD_DIR: /app/uploads
       LOG_FILE: /app/logs/bishe.log

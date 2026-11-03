@@ -19,4 +19,9 @@ public class Course {
 
     /** 是否结束: 0否, 1是 */
     private Integer isFinished;
+    private Boolean fixedSchedule;
+    private Integer classWeekday;
+    private String classTime;
+    private Boolean approvalRequired;
+    private Integer maxStudents;
 }

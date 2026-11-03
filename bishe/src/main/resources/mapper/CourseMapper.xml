@@ -8,16 +8,24 @@
         <result column="teacher_id" property="teacherId"/>
         <result column="course_name" property="courseName"/>
         <result column="is_finished" property="isFinished"/>
+        <result column="fixed_schedule" property="fixedSchedule"/>
+        <result column="class_weekday" property="classWeekday"/>
+        <result column="class_time" property="classTime"/>
+        <result column="approval_required" property="approvalRequired"/>
+        <result column="max_students" property="maxStudents"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.example.bishe.entity.Course"
             useGeneratedKeys="true" keyProperty="courseId">
-        INSERT INTO course (teacher_id, course_name, is_finished)
-        VALUES (#{teacherId}, #{courseName}, #{isFinished})
+        INSERT INTO course (teacher_id, course_name, is_finished, fixed_schedule, class_weekday, class_time, approval_required, max_students)
+        VALUES (#{teacherId}, #{courseName}, #{isFinished}, #{fixedSchedule}, #{classWeekday}, #{classTime}, #{approvalRequired}, #{maxStudents})
     </insert>
 
     <select id="findById" resultMap="CourseResultMap">
         SELECT * FROM course WHERE course_id = #{courseId}
+    </select>
+    <select id="findByIdForUpdate" resultMap="CourseResultMap">
+        SELECT * FROM course WHERE course_id = #{courseId} FOR UPDATE
     </select>
 
     <select id="findByIds" resultMap="CourseResultMap">

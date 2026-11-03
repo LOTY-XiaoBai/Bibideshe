@@ -28,17 +28,23 @@
           课程号 {{ searchResult.courseId }} · 教师 ID {{ searchResult.teacherId }} ·
           {{ searchResult.isFinished === 1 ? '已结课' : '进行中' }}
         </p>
+        <p v-if="searchResult.fixedSchedule">每周{{ weekdays[searchResult.classWeekday - 1] }} {{ searchResult.classTime }}</p>
+        <p v-if="searchResult.maxStudents">课程人数上限：{{ searchResult.maxStudents }} 人</p>
       </div>
       <el-button
         type="primary"
-        :disabled="searchResult.isFinished === 1 || isJoined(searchResult.courseId)"
+        :disabled="searchResult.isFinished === 1 || isJoined(searchResult.courseId) || isPending(searchResult.courseId)"
         :loading="joining"
         @click="handleJoin(searchResult.courseId)"
       >
-        {{ isJoined(searchResult.courseId) ? '已加入' : '加入班级' }}
+        {{ isJoined(searchResult.courseId) ? '已加入' : isPending(searchResult.courseId) ? '等待教师审核' : searchResult.approvalRequired ? '申请加入' : '加入班级' }}
       </el-button>
     </section>
 
+    <section v-if="applications.length" class="application-status">
+      <h3>我的入课申请</h3>
+      <div v-for="item in applications" :key="item.courseId" class="application-row"><span>{{ item.courseName }}</span><el-tag :type="item.status === 'PENDING' ? 'warning' : item.status === 'APPROVED' ? 'success' : 'info'">{{ { PENDING: '等待审核', APPROVED: '已通过', REJECTED: '未通过，可重新申请' }[item.status] }}</el-tag></div>
+    </section>
     <section class="list-section">
       <div class="list-section__title">
         <h3>已选课程</h3>
@@ -67,6 +73,7 @@
           </div>
 
           <div class="actions">
+            <el-button v-if="liveClass(course.courseId)?.mode === 'ONLINE'" size="small" type="primary" @click="router.push(`/student/live/${liveClass(course.courseId).sessionId}`)">进入直播间</el-button>
             <el-button size="small" @click="openDetail(course)">详情</el-button>
             <el-button
               size="small"
@@ -86,6 +93,8 @@
       <template v-if="detailCourse">
         <div class="detail-block">
           <p><span>课程号</span>{{ detailCourse.courseId }}</p>
+          <p v-if="detailCourse.fixedSchedule"><span>授课时间</span>每周{{ weekdays[detailCourse.classWeekday - 1] }} {{ detailCourse.classTime }}</p>
+          <p v-if="detailCourse.maxStudents"><span>人数上限</span>{{ detailCourse.maxStudents }} 人</p>
           <p><span>主讲教师</span>{{ teacherInfo?.teacherName || detailCourse.teacherId }}</p>
           <p><span>本课得分</span>{{ formatScore(scoreMap[detailCourse.courseId]) }}</p>
           <p>
@@ -134,7 +143,10 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { fetchApplications } from '@/api/classroom'
+import { useClassroomStore } from '@/stores/classroom'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   searchCourse,
@@ -159,6 +171,10 @@ const detailCourse = ref(null)
 const teacherInfo = ref(null)
 const members = ref([])
 const rateScore = ref(8)
+const router = useRouter(), classroom = useClassroomStore()
+const applications = ref([]), weekdays = ['一', '二', '三', '四', '五', '六', '日']
+const isPending = id => applications.value.some(a => String(a.courseId) === String(id) && a.status === 'PENDING')
+const liveClass = id => classroom.liveClasses.find(c => String(c.courseId) === String(id))
 
 function formatScore(score) {
   if (score === null || score === undefined || score === '') return '-'
@@ -172,11 +188,13 @@ function isJoined(courseId) {
 async function loadCourses() {
   loading.value = true
   try {
-    const [courseRes, scoreRes] = await Promise.all([
+    const [courseRes, scoreRes, applicationRes] = await Promise.all([
       fetchStudentCourses(),
       fetchMyCourseScores(),
+      fetchApplications('student'),
     ])
     courses.value = courseRes.data || []
+    applications.value = applicationRes.data || []
     Object.keys(scoreMap).forEach((key) => delete scoreMap[key])
     ;(scoreRes.data || []).forEach((item) => {
       scoreMap[item.courseId] = item.studentScore
@@ -209,8 +227,8 @@ async function handleSearch() {
 async function handleJoin(courseId) {
   joining.value = true
   try {
-    await joinCourse(courseId)
-    ElMessage.success('选课成功')
+    const res = await joinCourse(courseId)
+    ElMessage.success(res.message || '操作成功')
     await loadCourses()
   } catch {
     // handled
@@ -274,10 +292,15 @@ async function handleRate() {
   }
 }
 
-onMounted(loadCourses)
+let refreshTimer
+onMounted(() => { loadCourses(); refreshTimer = setInterval(loadCourses, 15000) })
+onUnmounted(() => clearInterval(refreshTimer))
 </script>
 
 <style scoped>
+.application-status { margin: 20px 0; padding: 20px; background: white; border: 1px solid #f0f2f5; border-radius: 16px; }
+.application-status h3 { margin: 0 0 12px; font-size: 17px; }
+.application-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid #f5f6f8; }
 .page__header h2 {
   margin: 0;
   font-size: 24px;
