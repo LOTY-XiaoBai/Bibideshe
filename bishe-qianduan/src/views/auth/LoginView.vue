@@ -139,7 +139,8 @@
         </el-button>
       </el-form>
 
-      <p v-if="!adminMode" class="auth-card__footer">
+      <p v-if="detectedRole === ROLES.MERCHANT" class="auth-card__footer">商家由管理员邀请入驻，首次登录使用初始密码。</p>
+      <p v-else-if="!adminMode" class="auth-card__footer">
         还没有账号？
         <RouterLink class="link" to="/register">立即注册</RouterLink>
       </p>
@@ -288,7 +289,7 @@ const subtitle = computed(() => {
 const idPlaceholder = computed(() =>
   adminMode.value
     ? '请输入管理员 ID（如 admin01234）'
-    : '学生以1开头，教师以2开头',
+    : '教师/学生ID',
 )
 
 const roleBadge = computed(() => {
@@ -300,6 +301,8 @@ const roleBadge = computed(() => {
 const iconClass = computed(() => {
   if (adminMode.value) return 'ph ph-shield-check'
   switch (detectedRole.value) {
+    case ROLES.MERCHANT:
+      return 'ph ph-storefront'
     case ROLES.TEACHER:
       return 'ph ph-chalkboard-teacher'
     case ROLES.ADMIN:

@@ -66,9 +66,6 @@
     </aside>
 
     <div class="main-area">
-      <div v-if="showAd" class="main-area__ad">
-        <AdBanner @action="goShop" @click="goShop" />
-      </div>
       <main class="main-area__content">
         <RouterView v-slot="{ Component }">
           <Transition name="page-fade" mode="out-in">
@@ -91,15 +88,13 @@ function menuCount(path){return path.endsWith('/activity')?unread.activityCount:
 
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import AdBanner from '@/components/AdBanner.vue'
 import { useUserStore } from '@/stores/user'
 import { startSessionGuard } from '@/utils/sessionGuard'
 
-const route = useRoute()
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
-const showAd = computed(() => route.path === '/student/home')
 
 const mainMenus = [
   { path: '/student/home', label: '系统首页', icon: 'ph ph-squares-four' },
@@ -137,10 +132,6 @@ onUnmounted(() => {
 
 function goSettings() {
   router.push('/student/settings')
-}
-
-function goShop() {
-  router.push('/student/shop')
 }
 
 function handleLogout() {
@@ -320,11 +311,6 @@ function handleLogout() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.main-area__ad {
-  flex-shrink: 0;
-  padding: 20px 28px 0;
 }
 
 .main-area__content {

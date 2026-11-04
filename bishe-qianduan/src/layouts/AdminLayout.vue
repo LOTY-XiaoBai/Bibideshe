@@ -23,8 +23,8 @@
           <i :class="item.icon" />
           <span>{{ item.label }}</span><CountBadge :count="menuCount(item.path)" />
           <el-badge
-            v-if="item.path === '/admin/ads' && pendingOrderCount > 0"
-            :value="pendingOrderCount"
+            v-if="item.path === '/admin/ads' && pendingReviewCount > 0"
+            :value="pendingReviewCount"
             class="nav-badge"
           />
         </RouterLink>
@@ -57,30 +57,31 @@ function menuCount(path){return path.endsWith('/activity')?unread.activityCount:
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { fetchPendingOrderCount } from '@/api/admin'
+import { reviewCounts } from '@/api/merchant'
 
 const router = useRouter()
 const userStore = useUserStore()
-const pendingOrderCount = ref(0)
+const pendingReviewCount = ref(0)
 let pollTimer = null
 
 const menus = [
   { path: '/admin/home', label: '管理首页', icon: 'ph ph-squares-four' },
+  { path: '/admin/merchants', label: '合作方商家', icon: 'ph ph-storefront' },
   { path: '/admin/activity', label: '动态', icon: 'ph ph-newspaper' },
   { path: '/admin/operations', label: '操作记录', icon: 'ph ph-clipboard-text' },
   { path: '/admin/accounts', label: '账号管理', icon: 'ph ph-user-minus' },
   { path: '/admin/courses', label: '课程管理', icon: 'ph ph-books' },
-  { path: '/admin/ads', label: '广告与订单', icon: 'ph ph-megaphone' },
+  { path: '/admin/ads', label: '广告与商品审核', icon: 'ph ph-megaphone' },
   { path: '/admin/audit', label: '题库审核', icon: 'ph ph-seal-check' },
   { path: '/admin/chat', label: '聊天监管', icon: 'ph ph-chats-circle' },
 ]
 
-async function refreshPendingOrders() {
+async function refreshPendingReviews() {
   try {
-    const res = await fetchPendingOrderCount()
-    pendingOrderCount.value = res.data?.count || 0
+    const res = await reviewCounts()
+    pendingReviewCount.value = Number(res.data?.products || 0) + Number(res.data?.campaigns || 0)
   } catch {
-    pendingOrderCount.value = 0
+    pendingReviewCount.value = 0
   }
 }
 
@@ -90,11 +91,13 @@ function handleLogout() {
 }
 
 onMounted(() => {
-  refreshPendingOrders()
-  pollTimer = window.setInterval(refreshPendingOrders, 30000)
+  refreshPendingReviews()
+  window.addEventListener('commerce-review-changed', refreshPendingReviews)
+  pollTimer = window.setInterval(refreshPendingReviews, 30000)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('commerce-review-changed', refreshPendingReviews)
   if (pollTimer) {
     window.clearInterval(pollTimer)
     pollTimer = null

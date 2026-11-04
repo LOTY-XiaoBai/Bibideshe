@@ -1,5 +1,6 @@
 <template>
   <div class="product" v-loading="loading">
+    <el-empty v-if="!loading && !product" description="商品未上架或商家已暂停营业" />
     <el-button @click="router.back()">返回</el-button
     ><template v-if="product"
       ><div class="hero">
@@ -11,7 +12,8 @@
         <div>
           <h1>{{ product.title }}</h1>
           <h2>¥ {{ product.price }}</h2>
-          <p>发货地：{{ product.detail.origin || "待商家补充" }}</p>
+          <p>发货地：{{ product.merchant_city || product.detail.origin || "待商家补充" }}</p>
+          <RouterLink class="product-store-link" :to="`/${getRole().toLowerCase()}/shop/merchant/${product.merchant_id}`"><el-avatar :size="38" :src="product.merchant_avatar || undefined">{{ product.merchant_name?.slice(0,1) }}</el-avatar><span>{{ product.merchant_name }}<small>进入商家主页，查看全部商品</small></span><i class="ph ph-arrow-up-right" /></RouterLink>
           <p>总销量 {{ product.sales }} · 综合评分 {{ product.score }}</p>
           <el-button
             v-if="!isAdmin"
@@ -36,19 +38,7 @@
         </article>
         <el-empty v-if="!product.reviews.length" description="暂无购买评价" />
       </section>
-      <section v-if="isAdmin">
-        <h2>编辑图文详情</h2>
-        <el-input
-          v-model="origin"
-          maxlength="120"
-          placeholder="发货地，例如浙江杭州"
-        /><BlockEditor v-model="blocks" /><el-button
-          type="primary"
-          @click="save"
-          >保存图文与发货地</el-button
-        >
-      </section></template
-    >
+    </template>
   </div>
 </template>
 <script setup>
@@ -59,14 +49,11 @@ import { createOrder } from "@/api/shop";
 import { getRole } from "@/utils/auth";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ContentBlocks from "@/components/ContentBlocks.vue";
-import BlockEditor from "@/components/BlockEditor.vue";
 const route = useRoute(),
   router = useRouter(),
   product = ref(null),
   loading = ref(false),
   buying = ref(false),
-  origin = ref(""),
-  blocks = ref("[]"),
   isAdmin = computed(() => getRole() === "ADMIN");
 async function load() {
   loading.value = true;
@@ -74,8 +61,8 @@ async function load() {
     product.value = (
       await request.get(`/api/extra/products/${route.params.id}`)
     ).data;
-    origin.value = product.value.detail.origin;
-    blocks.value = product.value.detail.blocks;
+  } catch {
+    product.value = null;
   } finally {
     loading.value = false;
   }
@@ -104,17 +91,10 @@ async function buy() {
     buying.value = false;
   }
 }
-async function save() {
-  await request.put(`/api/extra/products/${route.params.id}`, {
-    origin: origin.value,
-    blocks: blocks.value,
-  });
-  ElMessage.success("已保存");
-  await load();
-}
 onMounted(load);
 </script>
 <style scoped>
+.product-store-link{display:flex;align-items:center;gap:12px;border:1px solid #e9edf0;border-radius:12px;padding:12px 15px;margin:18px 0;color:#5c7581;font-size:13px}.product-store-link small{display:block;font-size:10px;color:#a1adb6;margin-top:5px}.product-store-link>i{margin-left:auto}.product-store-link :deep(.el-avatar){background:#eff3ef;color:#8b9e8a}
 .product {
   max-width: 1050px;
   margin: auto;

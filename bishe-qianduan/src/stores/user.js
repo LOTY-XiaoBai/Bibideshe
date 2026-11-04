@@ -40,6 +40,7 @@ export const useUserStore = defineStore('user', () => {
   const userId = computed(() => {
     if (!profile.value) return ''
     return (
+      profile.value.merchantId ||
       profile.value.studentId ||
       profile.value.teacherId ||
       profile.value.userId ||
@@ -77,7 +78,7 @@ export const useUserStore = defineStore('user', () => {
         name: profile.name || profile.displayName,
       },
     })
-    return roleHomePath(res.data.role)
+    return res.data.role === ROLES.MERCHANT && Number(profile.mustChangePassword) ? '/merchant/settings?welcome=1' : roleHomePath(res.data.role)
   }
 
   async function register(form) {
@@ -105,6 +106,12 @@ export const useUserStore = defineStore('user', () => {
 
   async function refreshProfile() {
     if (!token.value) return null
+    if (role.value === ROLES.MERCHANT) {
+      const { merchantProfile } = await import('@/api/merchant')
+      profile.value = (await merchantProfile()).data
+      saveAuth({ token: token.value, role: role.value, profile: profile.value })
+      return profile.value
+    }
     if (role.value === ROLES.STUDENT) {
       const res = await fetchStudentProfile()
       profile.value = {

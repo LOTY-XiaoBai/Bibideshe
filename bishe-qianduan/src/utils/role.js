@@ -3,6 +3,7 @@ export const ROLES = {
   STUDENT: 'STUDENT',
   TEACHER: 'TEACHER',
   ADMIN: 'ADMIN',
+  MERCHANT: 'MERCHANT',
 }
 
 /**
@@ -12,6 +13,7 @@ export const ROLES = {
 export function detectRoleFromId(id) {
   const value = String(id || '').trim()
   if (!value) return null
+  if (/^M[A-Z2-9]{15}$/i.test(value)) return ROLES.MERCHANT
   if (/^admin\d+$/i.test(value)) return ROLES.ADMIN
   if (/^1\d*$/.test(value)) return ROLES.STUDENT
   if (/^2\d*$/.test(value)) return ROLES.TEACHER
@@ -24,6 +26,8 @@ export function roleHomePath(role) {
       return '/student/home'
     case ROLES.TEACHER:
       return '/teacher/home'
+    case ROLES.MERCHANT:
+      return '/merchant/home'
     case ROLES.ADMIN:
       return '/admin/home'
     default:
@@ -37,6 +41,8 @@ export function roleLabel(role) {
       return '学生'
     case ROLES.TEACHER:
       return '教师'
+    case ROLES.MERCHANT:
+      return '商家'
     case ROLES.ADMIN:
       return '管理员'
     default:
@@ -50,6 +56,8 @@ export function themeRoleAttr(role) {
       return 'student'
     case ROLES.TEACHER:
       return 'teacher'
+    case ROLES.MERCHANT:
+      return 'merchant'
     case ROLES.ADMIN:
       return 'admin'
     default:

@@ -6,8 +6,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 广告/商品实体 (表4 advertisement)。
- * 广告即商品展示页, 师生均可浏览与下单。
+ * 商品实体，沿用 advertisement 表及 adId 以兼容历史订单。
+ * 首页广告独立保存在 merchant_campaign，商品需审核通过后才能浏览下单。
  */
 @Data
 public class Advertisement {
@@ -26,7 +26,7 @@ public class Advertisement {
     /** 商品价格 */
     private BigDecimal price;
 
-    /** 发布者(管理员ID) */
+    /** 发布者账号；新商品为16位商家账号 */
     private String publisherId;
 
     /** 综合评分(评价均值) */
@@ -36,4 +36,7 @@ public class Advertisement {
 
     /** 软删除/下架: 0正常, 1已下架 */
     private Integer isDeleted;
+    private Long merchantId;
+    private String merchantName;
+    private String reviewStatus;
 }

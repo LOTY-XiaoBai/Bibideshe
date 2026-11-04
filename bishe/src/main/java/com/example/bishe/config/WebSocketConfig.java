@@ -69,6 +69,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     String token = firstHeader(accessor, "Authorization");
                     if (token == null || token.isBlank()) token = firstHeader(accessor, "token");
                     AuthUser user = TokenUtil.parseToken(token);
+                    if (com.example.bishe.common.UserRole.MERCHANT.equals(user.getRole())) throw new BusinessException(403,"商家账号不使用社区或聊天功能");
                     authSessionService.assertActive(user);
                     accessor.setUser(new StompPrincipal(user));
                     return message;

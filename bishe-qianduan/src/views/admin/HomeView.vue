@@ -25,9 +25,10 @@ import CommunityFeed from '@/components/CommunityFeed.vue'
 const router = useRouter()
 
 const cards = [
+  { path: '/admin/merchants', label: '合作方商家', desc: '邀请与入驻管理', icon: 'ph ph-storefront' },
   { path: '/admin/accounts', label: '账号管理', desc: '注销师生账号', icon: 'ph ph-user-minus' },
   { path: '/admin/courses', label: '课程管理', desc: '删除课程', icon: 'ph ph-books' },
-  { path: '/admin/ads', label: '广告与订单', desc: '商城/物流/评价', icon: 'ph ph-megaphone' },
+  { path: '/admin/ads', label: '广告与商品审核', desc: '审批商家投放内容', icon: 'ph ph-megaphone' },
   { path: '/admin/audit', label: '题库审核', desc: '审核与删除题目', icon: 'ph ph-seal-check' },
   { path: '/admin/chat', label: '聊天监管', desc: '消息与群聊封禁', icon: 'ph ph-chats-circle' },
 ]

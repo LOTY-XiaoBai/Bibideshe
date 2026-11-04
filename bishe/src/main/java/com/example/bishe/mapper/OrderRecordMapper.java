@@ -22,7 +22,8 @@ public interface OrderRecordMapper {
     @Select("SELECT * FROM order_record WHERE order_id = #{orderId}")
     OrderRecord findById(Long orderId);
 
-    @Select("SELECT * FROM order_record WHERE buyer_id = #{buyerId} ORDER BY order_id DESC")
+    @Select("SELECT * FROM order_record WHERE buyer_id = #{buyerId} AND buyer_deleted=0 ORDER BY order_id DESC")
+    @org.apache.ibatis.annotations.Options(flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE)
     List<OrderRecord> findByBuyerId(Long buyerId);
 
     @Select("SELECT * FROM order_record ORDER BY order_id DESC LIMIT #{limit} OFFSET #{offset}")

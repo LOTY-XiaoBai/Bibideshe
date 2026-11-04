@@ -4,7 +4,7 @@
   Full-stack API smoke test for Docker deployment.
 
 .DESCRIPTION
-  Covers admin / teacher / student flows.
+  Covers admin / teacher / student / merchant flows.
   Requires CAPTCHA_EXPOSE_CODE=true on backend.
 
 .EXAMPLE
@@ -701,35 +701,78 @@ Assert-Api "GET /api/warning/unread" {
     Invoke-Api -Method GET -Path "/api/warning/unread" -Token $studentToken
 } | Out-Null
 
-Write-Step "10. Shop"
+Write-Step "10. Merchant commerce and advertising review"
+$merchantToken = $null
 if ($adminToken) {
-    $ad = Assert-Api "POST /api/shop/admin/ad/publish" {
-        Invoke-Api -Method POST -Path "/api/shop/admin/ad/publish" -Token $adminToken -Body @{
-            title    = "Item$ts"
-            content  = "auto test item"
-            imageUrl = "/uploads/demo.png"
-            price    = 19.9
+    $invitation = Assert-Api "POST /api/admin/merchants/invitations" {
+        Invoke-Api -Method POST -Path "/api/admin/merchants/invitations" -Token $adminToken
+    }
+    if ($invitation) {
+        $session = New-Login "/api/merchant/login" $invitation.data.accountCode "123456"
+        $merchantToken = $session.token
+        $onboarding = Assert-Api "PUT /api/merchant/profile (mandatory onboarding)" {
+            Invoke-Api -Method PUT -Path "/api/merchant/profile" -Token $merchantToken -Body @{
+                name = "Merchant$ts"; city = "Hangzhou"; currentPassword = "123456"; newPassword = $Password
+            }
+        }
+        if ($onboarding) { $merchantToken = $onboarding.data.token }
+    }
+    $cover = Assert-Api "POST /api/file/upload/image (merchant product cover)" {
+        Add-Type -AssemblyName System.Net.Http
+        $http = [System.Net.Http.HttpClient]::new()
+        $multipart = [System.Net.Http.MultipartFormDataContent]::new()
+        try {
+            $http.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $merchantToken)
+            $filePath = Join-Path (Split-Path -Parent $PSScriptRoot) "bishe-qianduan/src/assets/hero.png"
+            $fileContent = [System.Net.Http.ByteArrayContent]::new([System.IO.File]::ReadAllBytes($filePath))
+            $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::new("image/png")
+            $multipart.Add($fileContent, "file", "cover.png")
+            $response = $http.PostAsync("$BaseUrl/api/file/upload/image", $multipart).GetAwaiter().GetResult()
+            $response.EnsureSuccessStatusCode() | Out-Null
+            $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+        } finally { $multipart.Dispose(); $http.Dispose() }
+    }
+    $ad = Assert-Api "POST /api/merchant/products" {
+        Invoke-Api -Method POST -Path "/api/merchant/products" -Token $merchantToken -Body @{
+            title = "Item$ts"; content = "auto test item"; imageUrl = $cover.data.url; price = 29.9
+            blocks = '[{"type":"text","value":"Product details for the automated commerce flow."}]'
         }
     }
     if ($ad) {
-        $adId = [int64]$ad.data.adId
-        Write-Host "  Ad ID = $adId"
-    }
-
-    Assert-Api "POST /api/shop/admin/ad/update" {
-        Invoke-Api -Method POST -Path "/api/shop/admin/ad/update" -Token $adminToken -Body @{
-            adId     = $adId
-            title    = "ItemUpdated$ts"
-            content  = "updated"
-            imageUrl = "/uploads/demo.png"
-            price    = 29.9
+        $adId = [int64]$ad.data.id
+        Assert-Api "POST /api/admin/commerce/products/{id}/review" {
+            Invoke-Api -Method POST -Path "/api/admin/commerce/products/$adId/review" -Token $adminToken -Body @{
+                decision = "APPROVED"; revision = $ad.data.revision
+            }
+        } | Out-Null
+        $campaign = Assert-Api "POST /api/merchant/campaigns" {
+            Invoke-Api -Method POST -Path "/api/merchant/campaigns" -Token $merchantToken -Body @{
+                title = "Campaign$ts"; content = "Campus essentials"; imageUrl = $cover.data.url; productId = $adId
+            }
         }
-    } | Out-Null
-
-    Assert-Api "GET /api/shop/admin/ad/list" {
-        Invoke-Api -Method GET -Path "/api/shop/admin/ad/list" -Token $adminToken -Query @{ page = 1; size = 10 }
+        if ($campaign) {
+            Assert-Api "POST /api/admin/commerce/campaigns/{id}/review" {
+                Invoke-Api -Method POST -Path "/api/admin/commerce/campaigns/$($campaign.data.id)/review" -Token $adminToken -Body @{
+                    decision = "APPROVED"; revision = $campaign.data.revision
+                }
+            } | Out-Null
+            Assert-Api "PUT /api/admin/commerce/campaigns/{id}/carousel" {
+                Invoke-Api -Method PUT -Path "/api/admin/commerce/campaigns/$($campaign.data.id)/carousel" -Token $adminToken -Body @{
+                    enabled = $true; revision = ([int]$campaign.data.revision + 1)
+                }
+            } | Out-Null
+        }
+    }
+    Assert-Api "GET /api/shop/campaigns" {
+        Invoke-Api -Method GET -Path "/api/shop/campaigns" -Token $studentToken
     } | Out-Null
 }
+
+Assert-Api "PUT /api/extra/profile (shipping address)" {
+    Invoke-Api -Method PUT -Path "/api/extra/profile" -Token $studentToken -Body @{
+        gender = "保密"; recipient = "Test recipient"; phone = "13000000000"; address = "Test shipping address"
+    }
+} | Out-Null
 
 Assert-Api "GET /api/shop/ad/list" {
     Invoke-Api -Method GET -Path "/api/shop/ad/list" -Token $studentToken
@@ -761,9 +804,8 @@ if ($adminToken -and $orderId) {
         Invoke-Api -Method GET -Path "/api/shop/admin/order/pending-count" -Token $adminToken
     } | Out-Null
 
-    Assert-Api "POST /api/shop/admin/order/logistics" {
-        Invoke-Api -Method POST -Path "/api/shop/admin/order/logistics" -Token $adminToken -Body @{
-            orderId       = $orderId
+    Assert-Api "PUT /api/merchant/orders/{id}/logistics" {
+        Invoke-Api -Method PUT -Path "/api/merchant/orders/$orderId/logistics" -Token $merchantToken -Body @{
             logisticsInfo = "SF123456789CN"
         }
     } | Out-Null
@@ -789,9 +831,8 @@ Assert-Api "POST /api/shop/order/after-sale" {
 } | Out-Null
 
 if ($adminToken) {
-    Assert-Api "POST /api/shop/admin/order/after-sale/reply" {
-        Invoke-Api -Method POST -Path "/api/shop/admin/order/after-sale/reply" -Token $adminToken -Body @{
-            orderId = $orderId
+    Assert-Api "PUT /api/merchant/orders/{id}/after-sale" {
+        Invoke-Api -Method PUT -Path "/api/merchant/orders/$orderId/after-sale" -Token $merchantToken -Body @{
             reply   = "approved"
         }
     } | Out-Null

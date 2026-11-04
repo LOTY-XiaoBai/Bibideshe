@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 购物与广告服务: 管理员发布商品/物流, 师生浏览下单、收货、评价与售后。
+ * 师生购物、订单与评价服务；商家提交及管理员审核由 MerchantCommerceService 处理。
  */
 @Service
 public class ShopService {
@@ -47,16 +47,18 @@ public class ShopService {
     private final OrderEvaluationMapper orderEvaluationMapper;
     private final SocialUserService socialUserService;
     private final ProfileShopService profileShopService;
+    private final org.springframework.jdbc.core.JdbcTemplate db;
 
     public ShopService(AdvertisementMapper advertisementMapper,
                        OrderRecordMapper orderRecordMapper,
                        OrderEvaluationMapper orderEvaluationMapper,
-                       SocialUserService socialUserService, ProfileShopService profileShopService) {
+                       SocialUserService socialUserService, ProfileShopService profileShopService, org.springframework.jdbc.core.JdbcTemplate db) {
         this.advertisementMapper = advertisementMapper;
         this.orderRecordMapper = orderRecordMapper;
         this.orderEvaluationMapper = orderEvaluationMapper;
         this.socialUserService = socialUserService;
         this.profileShopService = profileShopService;
+        this.db = db;
     }
 
     // ==================== 管理员: 广告/商品 ====================
@@ -114,7 +116,12 @@ public class ShopService {
     // ==================== 师生: 浏览广告 ====================
 
     public List<Advertisement> listActiveAds() {
-        return advertisementMapper.findAllActive();
+        return listActiveAds("");
+    }
+    public List<Advertisement> listActiveAds(String keyword) {
+        if(keyword==null)keyword="";
+        if(keyword.length()>100)throw new BusinessException("搜索关键词最多100字");
+        return advertisementMapper.searchActive("%"+keyword.trim().replace("!","!!").replace("%","!%").replace("_","!_")+"%");
     }
 
     public Advertisement getAdDetail(Long adId) {
@@ -130,6 +137,7 @@ public class ShopService {
         }
         socialUserService.requireProfile(buyerId);
         String shipping = profileShopService.shipping(buyerId);
+        db.queryForList("SELECT ad_id FROM advertisement WHERE ad_id=? FOR UPDATE",request.getAdId());
         Advertisement ad = requireActiveAd(request.getAdId());
 
         OrderRecord order = new OrderRecord();
@@ -141,6 +149,7 @@ public class ShopService {
         order.setAfterSaleStatus(AFTER_SALE_NONE);
         orderRecordMapper.insert(order);
         profileShopService.snapshot(order.getOrderId(), shipping);
+        db.update("UPDATE order_record SET merchant_id=?,product_title=?,unit_price=?,ship_origin=(SELECT city FROM merchant WHERE merchant_id=?) WHERE order_id=?",ad.getMerchantId(),ad.getTitle(),ad.getPrice(),ad.getMerchantId(),order.getOrderId());
         return toOrderVO(orderRecordMapper.findById(order.getOrderId()));
     }
 
@@ -154,6 +163,7 @@ public class ShopService {
     }
 
     public OrderVO getMyOrder(Long buyerId, Long orderId) {
+        if(db.queryForObject("SELECT COUNT(*) FROM order_record WHERE order_id=? AND buyer_id=? AND buyer_deleted=0",Long.class,orderId,buyerId)==0)throw new BusinessException(404,"订单不存在或已删除");
         OrderRecord order = requireOrder(orderId);
         if (!buyerId.equals(order.getBuyerId())) {
             throw new BusinessException("无权查看该订单");
@@ -174,6 +184,14 @@ public class ShopService {
             throw new BusinessException("已确认收货, 请勿重复操作");
         }
         orderRecordMapper.confirmReceived(orderId);
+    }
+
+    @Transactional
+    public void deleteMyOrder(Long buyerId,Long orderId){
+        var rows=db.queryForList("SELECT status,after_sale_status FROM order_record WHERE order_id=? AND buyer_id=? AND buyer_deleted=0 FOR UPDATE",orderId,buyerId);
+        if(rows.isEmpty())throw new BusinessException(404,"订单不存在或不属于当前账号");
+        var row=rows.get(0);if(((Number)row.get("status")).intValue()!=2||((Number)row.get("after_sale_status")).intValue()==1)throw new BusinessException("仅可删除已收货且无进行中售后的历史订单");
+        db.update("UPDATE order_record SET buyer_deleted=1 WHERE order_id=?",orderId);
     }
 
     @Transactional
@@ -337,7 +355,8 @@ public class ShopService {
 
     private Advertisement requireActiveAd(Long adId) {
         Advertisement ad = requireAd(adId);
-        if (ad.getIsDeleted() != null && ad.getIsDeleted() == 1) {
+        if(ad.getMerchantId()!=null && db.queryForObject("SELECT COUNT(*) FROM merchant WHERE merchant_id=? AND is_banned=0",Long.class,ad.getMerchantId())==0)throw new BusinessException("该商家暂停营业，商品暂不可购买");
+        if ((ad.getIsDeleted() != null && ad.getIsDeleted() == 1) || ad.getMerchantId()==null || !"APPROVED".equals(ad.getReviewStatus())) {
             throw new BusinessException("该商品已下架");
         }
         return ad;
@@ -358,6 +377,10 @@ public class ShopService {
         OrderVO vo = new OrderVO();
         vo.setOrder(order);
         vo.setAdvertisement(advertisementMapper.findById(order.getAdId()));
+        if (vo.getAdvertisement()!=null && order.getProductTitle()!=null) {
+            vo.getAdvertisement().setTitle(order.getProductTitle());
+            vo.getAdvertisement().setPrice(order.getUnitPrice());
+        }
         vo.setBuyer(socialUserService.findProfile(order.getBuyerId()));
         vo.setEvaluation(orderEvaluationMapper.findByOrderId(order.getOrderId()));
         return vo;

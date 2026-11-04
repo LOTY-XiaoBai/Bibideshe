@@ -67,7 +67,7 @@ public final class AuthContext {
      */
     public static Long requireUserId() {
         AuthUser user = requireLogin();
-        if (UserRole.ADMIN.equals(user.getRole()) || user.getUserId() == null) {
+        if ((!UserRole.STUDENT.equals(user.getRole()) && !UserRole.TEACHER.equals(user.getRole())) || user.getUserId() == null) {
             throw new BusinessException(403, "当前账号不支持此操作");
         }
         return user.getUserId();

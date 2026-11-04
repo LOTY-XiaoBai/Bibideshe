@@ -29,12 +29,14 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final ModerationService moderationService;
     private final JsonMapper jsonMapper;
     private final AuthSessionService authSessionService;
+    private final com.example.bishe.service.MerchantService merchants;
 
     public AuthInterceptor(ModerationService moderationService, JsonMapper jsonMapper,
-                           AuthSessionService authSessionService) {
+                           AuthSessionService authSessionService, com.example.bishe.service.MerchantService merchants) {
         this.moderationService = moderationService;
         this.jsonMapper = jsonMapper;
         this.authSessionService = authSessionService;
+        this.merchants = merchants;
     }
 
     @Override
@@ -46,6 +48,19 @@ public class AuthInterceptor implements HandlerInterceptor {
         try {
             AuthUser user = TokenUtil.parseToken(authorization);
             authSessionService.assertActive(user);
+            if (UserRole.MERCHANT.equals(user.getRole())) {
+                boolean onboarding = merchants.assertSession(user);
+                String path = request.getRequestURI().substring(request.getContextPath().length());
+                boolean profile = path.equals("/api/merchant/profile") || path.equals("/api/merchant/location/city") || path.equals("/api/merchant/location/available") || path.equals("/api/auth/logout");
+                boolean business = path.startsWith("/api/merchant/") || path.equals("/api/file/upload/image");
+                if ((!profile && !business) || (onboarding && !profile)) {
+                    response.setStatus(403);
+                    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.getWriter().write(jsonMapper.writeValueAsString(Map.of("code",403,"message",onboarding?"请先修改初始密码并完善发货城市":"商家账号仅可访问自己的商家工作台")));
+                    return false;
+                }
+            }
             if (UserRole.STUDENT.equals(user.getRole()) || UserRole.TEACHER.equals(user.getRole())) {
                 try {
                     moderationService.assertAccountActive(user.getUserId());
@@ -60,6 +75,10 @@ public class AuthInterceptor implements HandlerInterceptor {
             AuthContext.set(user);
             return true;
         } catch (BusinessException e) {
+            if (e.getCode()==403 && e.getData() instanceof Map<?,?> data && "MERCHANT_BANNED".equals(data.get("type"))) {
+                response.setStatus(403);response.setCharacterEncoding(StandardCharsets.UTF_8.name());response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.getWriter().write(jsonMapper.writeValueAsString(Map.of("code",403,"message",e.getMessage(),"data",e.getData())));return false;
+            }
             if (e.getCode() == 403 && e.getData() instanceof BanInfo) {
                 writeBanned(response, e.getMessage(), (BanInfo) e.getData());
                 return false;

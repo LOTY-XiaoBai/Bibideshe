@@ -1,8 +1,8 @@
 <template>
-  <div class="ad-banner" @click="$emit('click')">
+  <div class="ad-banner" role="link" tabindex="0" @click="$emit('click')" @keydown.enter="$emit('click')">
     <div class="ad-banner__glow" />
     <div class="ad-banner__content">
-      <span class="ad-banner__tag">官方推荐广告</span>
+      <span class="ad-banner__tag">系统推荐 · 周边商城</span>
       <h3 class="ad-banner__title">{{ title }}</h3>
       <p class="ad-banner__desc">{{ description }}</p>
       <button type="button" class="ad-banner__btn" @click.stop="$emit('action')">

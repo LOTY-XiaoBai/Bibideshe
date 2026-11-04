@@ -1,5 +1,6 @@
 <template>
   <div class="home-page">
+    <AdCarousel />
     <h2>系统首页</h2>
     <p class="subtitle">欢迎回来，{{ userStore.displayName || '同学' }}。请从左侧导航进入各功能模块。</p>
 
@@ -26,6 +27,7 @@
 <script setup>
 import { useUserStore } from '@/stores/user'
 import CommunityFeed from '@/components/CommunityFeed.vue'
+import AdCarousel from '@/components/AdCarousel.vue'
 
 const userStore = useUserStore()
 

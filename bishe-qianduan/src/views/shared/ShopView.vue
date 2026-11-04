@@ -3,7 +3,7 @@
     <header class="page-header">
       <div>
         <h2>周边商城</h2>
-        <p>浏览在售广告商品，下单后可查看物流、确认收货与评价反馈</p>
+        <p>浏览合作商家已审核上架的商品，下单后可查看物流、确认收货与评价反馈</p>
       </div>
       <div class="header-tabs">
         <button
@@ -25,6 +25,7 @@
       </div>
     </header>
 
+    <el-form v-if="mainTab==='goods'" class="shop-search" @submit.prevent="loadAds"><el-input v-model="keyword" size="large" clearable maxlength="100" placeholder="搜索商品、商家或发货城市" aria-label="搜索商品、商家或发货城市" @clear="loadAds"><template #prefix><i class="ph ph-magnifying-glass" /></template></el-input><el-button native-type="submit" type="primary" size="large" :loading="adsLoading">搜索</el-button></el-form>
     <!-- 商品列表 -->
     <section v-show="mainTab === 'goods'" v-loading="adsLoading" class="goods-grid">
       <article
@@ -42,10 +43,10 @@
           <div v-else class="goods-cover__placeholder">
             <i class="ph ph-package" />
           </div>
-          <span class="goods-tag">官方广告</span>
+          <span class="goods-tag">合作商家</span>
         </div>
         <div class="goods-body">
-          <h3>{{ ad.title || `商品 #${ad.adId}` }}</h3>
+          <h3>{{ ad.title || `商品 #${ad.adId}` }}</h3><RouterLink v-if="ad.merchantId" class="goods-merchant" :to="`/${getRole().toLowerCase()}/shop/merchant/${ad.merchantId}`" @click.stop><i class="ph ph-storefront" /> {{ ad.merchantName||'进入店铺' }} <i class="ph ph-caret-right" /></RouterLink>
           <p>{{ ad.content || '暂无描述' }}</p>
           <div class="goods-foot">
             <span class="price">¥ {{ formatPrice(ad.price) }}</span>
@@ -56,7 +57,7 @@
           </el-button>
         </div>
       </article>
-      <p v-if="!adsLoading && !ads.length" class="empty-tip">暂无在售商品</p>
+      <p v-if="!adsLoading && !ads.length" class="empty-tip">{{ keyword ? '没有找到匹配的商品，换个关键词试试' : '暂无在售商品' }}</p>
     </section>
 
     <!-- 订单中心 -->
@@ -124,6 +125,7 @@
             >
               申请售后
             </el-button>
+            <el-button v-if="item.order?.status===2 && item.order?.afterSaleStatus!==1" size="small" type="danger" plain @click="removeOrder(item.order.orderId)">删除订单记录</el-button>
           </div>
         </div>
       </div>
@@ -229,6 +231,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { resolveMediaUrl } from '@/utils/media'
 import {
   fetchAdList,
+  deleteMyOrder,
   fetchAdDetail,
   createOrder,
   fetchMyOrders,
@@ -239,6 +242,8 @@ import {
 } from '@/api/shop'
 
 const mainTab = ref('goods')
+const keyword = ref('')
+let searchVersion=0
 const ads = ref([])
 const adsLoading = ref(false)
 const orders = ref([])
@@ -294,14 +299,16 @@ function statusTag(s) {
 }
 
 async function loadAds() {
+  const stamp=++searchVersion
   adsLoading.value = true
   try {
-    const res = await fetchAdList()
+    const res = await fetchAdList(keyword.value)
+    if(stamp!==searchVersion)return
     ads.value = res.data || []
   } catch {
-    ads.value = []
+    if(stamp===searchVersion)ads.value = []
   } finally {
-    adsLoading.value = false
+    if(stamp===searchVersion)adsLoading.value = false
   }
 }
 
@@ -355,6 +362,7 @@ async function openOrderDetail(item) {
   showOrderDetail.value = true
 }
 
+async function removeOrder(id){const ok=await ElMessageBox.confirm('删除后该订单将从你的列表中移除，商家的履约记录和商品评价会保留。','删除历史订单',{type:'warning',confirmButtonText:'删除记录',cancelButtonText:'取消'}).then(()=>true).catch(()=>false);if(!ok)return;try{await deleteMyOrder(id);ElMessage.success('订单记录已删除');await loadOrders()}catch{}}
 async function doConfirm(orderId) {
   try {
     await ElMessageBox.confirm('确认已收到商品？', '确认收货', { type: 'warning' })
@@ -428,6 +436,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.shop-search{display:flex;gap:12px;max-width:720px;margin-bottom:24px}.shop-search .el-input{flex:1}.goods-merchant{display:inline-flex;gap:6px;align-items:center;font-size:11px;color:#8e9eaf;margin:3px 0 10px}.goods-merchant:hover{color:var(--theme-primary)}
 .page-header {
   display: flex;
   align-items: flex-end;

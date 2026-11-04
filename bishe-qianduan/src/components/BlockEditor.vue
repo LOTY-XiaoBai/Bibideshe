@@ -1,79 +1,20 @@
 <template>
-  <div>
-    <div v-for="(b, i) in blocks" :key="i" class="block">
-      <el-input
-        v-if="b.type === 'text'"
-        v-model="b.value"
-        type="textarea"
-        :rows="4"
-        maxlength="10000"
-        placeholder="填写文字，可在段落间插入图片"
-        @input="emitValue"
-      /><img v-else :src="b.value" alt="已上传图片" /><el-button
-        text
-        type="danger"
-        @click="
-          blocks.splice(i, 1);
-          emitValue();
-        "
-        >移除此段</el-button
-      >
-    </div>
-    <el-button @click="blocks.push({ type: 'text', value: '' })"
-      >添加文字段落</el-button
-    ><el-upload
-      :show-file-list="false"
-      accept="image/jpeg,image/png,image/gif,image/webp"
-      :http-request="upload"
-      ><el-button :loading="uploading">插入图片</el-button></el-upload
-    >
+  <div class="story-editor">
+    <div v-if="!blocks.length" class="story-empty"><i class="ph ph-text-aa" /><strong>从一个段落开始，讲述你的故事</strong><p>文字与图片自由组合，右侧即可看到预览。</p></div>
+    <article v-for="(b,i) in blocks" :key="i" class="story-block"><header><span><i :class="b.type==='text'?'ph ph-text-aa':'ph ph-image'" /> {{ b.type==='text'?'文字段落':'图片段落' }} <small>{{ String(i+1).padStart(2,'0') }}</small></span><div><el-button text size="small" :disabled="i===0" :aria-label="`上移第${i+1}段`" @click="move(i,-1)"><i class="ph ph-arrow-up" /></el-button><el-button text size="small" :disabled="i===blocks.length-1" :aria-label="`下移第${i+1}段`" @click="move(i,1)"><i class="ph ph-arrow-down" /></el-button><el-button text size="small" type="danger" :aria-label="`删除第${i+1}段`" @click="blocks.splice(i,1);emitValue()"><i class="ph ph-trash" /></el-button></div></header><el-input v-if="b.type==='text'" v-model="b.value" type="textarea" :rows="4" maxlength="10000" show-word-limit placeholder="介绍商品细节、材质、尺寸，或写下你想分享的故事…" @input="emitValue" /><img v-else :src="b.value" alt="图文图片" /></article>
+    <div class="story-toolbar"><el-button :disabled="blocks.length>=50" @click="addText"><i class="ph ph-plus" /> 添加文字段落</el-button><el-upload :show-file-list="false" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp" :http-request="upload" :disabled="uploading||blocks.length>=50"><el-button :loading="uploading" :disabled="blocks.length>=50"><i class="ph ph-image" /> 插入图片</el-button></el-upload><span>{{ blocks.length }} / 50 段</span></div>
   </div>
 </template>
 <script setup>
-import { ref, watch } from "vue";
-import { uploadImage } from "@/api/file";
-const props = defineProps({ modelValue: { type: String, default: "[]" } }),
-  emit = defineEmits(["update:modelValue"]);
-const blocks = ref([]),
-  uploading = ref(false);
-watch(
-  () => props.modelValue,
-  (v) => {
-    try {
-      if (v !== JSON.stringify(blocks.value)) blocks.value = JSON.parse(v);
-    } catch {
-      blocks.value = [];
-    }
-  },
-  { immediate: true },
-);
-function emitValue() {
-  emit("update:modelValue", JSON.stringify(blocks.value));
-}
-async function upload({ file, onSuccess, onError }) {
-  uploading.value = true;
-  try {
-    const r = await uploadImage(file);
-    blocks.value.push({ type: "image", value: r.data.url });
-    emitValue();
-    onSuccess(r);
-  } catch (e) {
-    onError(e);
-  } finally {
-    uploading.value = false;
-  }
-}
+import { ref,watch } from 'vue'
+import { uploadImage } from '@/api/file'
+const props=defineProps({modelValue:{type:String,default:'[]'}}),emit=defineEmits(['update:modelValue','busy']),blocks=ref([]),uploading=ref(false)
+watch(()=>props.modelValue,v=>{try{const parsed=JSON.parse(v);if(Array.isArray(parsed)&&v!==JSON.stringify(blocks.value))blocks.value=parsed}catch{blocks.value=[]}},{immediate:true})
+function emitValue(){emit('update:modelValue',JSON.stringify(blocks.value))}
+function addText(){if(blocks.value.length>=50)return;blocks.value.push({type:'text',value:''});emitValue()}
+function move(i,delta){const target=i+delta;if(target<0||target>=blocks.value.length)return;[blocks.value[i],blocks.value[target]]=[blocks.value[target],blocks.value[i]];emitValue()}
+async function upload({file,onSuccess,onError}){if(uploading.value||blocks.value.length>=50)return;uploading.value=true;emit('busy',true);try{const r=await uploadImage(file);blocks.value.push({type:'image',value:r.data.url});emitValue();onSuccess(r)}catch(e){onError(e)}finally{uploading.value=false;emit('busy',false)}}
 </script>
 <style scoped>
-.block {
-  margin: 12px 0;
-}
-.block img {
-  max-width: 100%;
-  max-height: 220px;
-}
-.el-upload {
-  display: inline-flex;
-  margin: 12px;
-}
+.story-empty{text-align:center;border:1px dashed #dce2d3;border-radius:12px;background:#fafbf7;padding:30px 16px;color:#a5af94}.story-empty>i{display:block;font-size:29px;margin-bottom:12px;color:#b5bfa4}.story-empty strong{font-size:13px;font-weight:500}.story-empty p{font-size:11px;line-height:1.8;margin-bottom:0}.story-block{border:1px solid #e3e8dc;border-radius:12px;padding:14px;margin-bottom:14px;background:#fcfdf9}.story-block header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.story-block header>span{display:flex;align-items:center;gap:8px;color:#7f916b;font-size:12px}.story-block header small{font-size:10px;color:#b1bba3}.story-block header .el-button{padding:5px;margin-left:0}.story-block img{display:block;width:100%;max-height:300px;object-fit:contain;border-radius:8px;background:#f0f3e9}.story-block :deep(.el-textarea__inner){box-shadow:0 0 0 1px #e7ebdf;padding:12px;font-size:13px;line-height:1.9;background:#fff}.story-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:1px solid #edf0e5}.story-toolbar .el-button{font-size:12px;border-radius:9px;padding:11px 14px;height:auto;border-color:#dfe6d5;color:#71865d;background:#fbfcf8}.story-toolbar i{margin-right:6px;font-size:16px}.story-toolbar>span{margin-left:auto;font-size:10px;color:#a8b198}
 </style>

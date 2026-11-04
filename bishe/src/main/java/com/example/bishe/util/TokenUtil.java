@@ -99,7 +99,7 @@ public final class TokenUtil {
             }
         }
         String role = fields[1];
-        if (!UserRole.STUDENT.equals(role) && !UserRole.TEACHER.equals(role) && !UserRole.ADMIN.equals(role)) {
+        if (!UserRole.STUDENT.equals(role) && !UserRole.TEACHER.equals(role) && !UserRole.ADMIN.equals(role) && !UserRole.MERCHANT.equals(role)) {
             throw new BusinessException(401, "登录凭证角色无效");
         }
         return new AuthUser(userId, fields[2], role, fields[4], expireAt);

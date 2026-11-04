@@ -63,6 +63,7 @@ services:
       RTC_TURN_URL: ${RTC_TURN_URL:-}
       RTC_TURN_USERNAME: ${RTC_TURN_USERNAME:-}
       RTC_TURN_CREDENTIAL: ${RTC_TURN_CREDENTIAL:-}
+      AMAP_WEB_KEY: ${AMAP_WEB_KEY:-}
       SERVER_PORT: 8080
       UPLOAD_DIR: /app/uploads
       LOG_FILE: /app/logs/bishe.log

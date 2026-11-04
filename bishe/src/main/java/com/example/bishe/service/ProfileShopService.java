@@ -23,12 +23,12 @@ public class ProfileShopService {
   var r=rows.get(0);return r.get("recipient")+" | "+r.get("phone")+" | "+r.get("address");
  }
  public Map<String,Object> product(long id){
-  var rows=db.queryForList("SELECT * FROM advertisement WHERE ad_id=? AND IFNULL(is_deleted,0)=0",id);if(rows.isEmpty())throw new BusinessException(404,"商品已下架或不存在");var r=rows.get(0);
+  var rows=db.queryForList("SELECT p.*,m.name AS merchant_name,m.city AS merchant_city,m.avatar AS merchant_avatar FROM advertisement p JOIN merchant m ON m.merchant_id=p.merchant_id WHERE p.ad_id=? AND p.is_deleted=0 AND p.review_status='APPROVED' AND m.is_banned=0",id);if(rows.isEmpty())throw new BusinessException(404,"商品未上架或不存在");var r=rows.get(0);
   var detail=db.queryForList("SELECT * FROM product_detail WHERE ad_id=?",id);r.put("detail",detail.isEmpty()?Map.of("origin","待商家补充","blocks","[]"):detail.get(0));
   r.put("sales",db.queryForObject("SELECT COUNT(*) FROM order_record WHERE ad_id=?",Long.class,id));
   r.put("reviews",db.queryForList("SELECT e.rating,e.feedback_content,e.publish_time FROM order_evaluation e JOIN order_record o ON o.order_id=e.order_id WHERE o.ad_id=? ORDER BY e.publish_time DESC LIMIT 200",id));return r;
  }
- public void productSave(long id,Map<String,Object>b){AuthContext.requireAdmin();product(id);String blocks=community.blocks(b);db.update("INSERT INTO product_detail(ad_id,origin,blocks) VALUES(?,?,?) ON DUPLICATE KEY UPDATE origin=VALUES(origin),blocks=VALUES(blocks)",id,community.text(b,"origin",120),blocks);}
+ public void productSave(long id,Map<String,Object>b){AuthContext.requireAdmin();throw new BusinessException(410,"商品详情由所属商家提交，管理员负责审核");}
  @Scheduled(fixedDelay=60000,initialDelay=60000)
  @Transactional
  public void autoReview(){

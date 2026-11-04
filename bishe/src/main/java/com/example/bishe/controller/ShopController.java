@@ -45,14 +45,14 @@ public class ShopController {
     @PostMapping("/admin/ad/publish")
     public Result<Advertisement> publishAd(@RequestBody AdPublishRequest request) {
         String adminId = AuthContext.requireAdminId();
-        return Result.success("广告发布成功", shopService.publishAd(adminId, request));
+        throw new com.example.bishe.common.BusinessException(410,"请由合作方商家提交商品和广告申请，再由管理员审核");
     }
 
     @Operation(summary = "更新广告/商品")
     @PostMapping("/admin/ad/update")
     public Result<Advertisement> updateAd(@RequestBody AdPublishRequest request) {
         AuthContext.requireAdmin();
-        return Result.success("广告已更新", shopService.updateAd(request));
+        throw new com.example.bishe.common.BusinessException(410,"商品和广告由所属商家编辑，管理员负责审核");
     }
 
     @Operation(summary = "下架广告/商品")
@@ -123,9 +123,9 @@ public class ShopController {
 
     @Operation(summary = "浏览在售广告商品")
     @GetMapping("/ad/list")
-    public Result<List<Advertisement>> listAds() {
+    public Result<List<Advertisement>> listAds(@RequestParam(defaultValue="") String keyword) {
         AuthContext.requireUserId();
-        return Result.success(shopService.listActiveAds());
+        return Result.success(shopService.listActiveAds(keyword));
     }
 
     @Operation(summary = "广告/商品详情")
@@ -148,6 +148,8 @@ public class ShopController {
         Long buyerId = AuthContext.requireUserId();
         return Result.success(shopService.listMyOrders(buyerId));
     }
+    @org.springframework.web.bind.annotation.DeleteMapping("/order/{orderId}")
+    public Result<Void> deleteOrder(@PathVariable Long orderId){shopService.deleteMyOrder(AuthContext.requireUserId(),orderId);return Result.success("订单记录已删除",null);}
 
     @Operation(summary = "订单详情(含物流)")
     @GetMapping("/order/{orderId}")

@@ -29,6 +29,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class SecurityRegressionTests {
+    @Test
+    void emptyReviewStatusMeansAllRecordsWhileOmittedStatusDefaultsToPending() throws Exception {
+        var commerce = mock(com.example.bishe.service.MerchantCommerceService.class);
+        var controller = new com.example.bishe.controller.MerchantController(
+                mock(com.example.bishe.service.MerchantService.class), commerce,
+                mock(com.example.bishe.service.MerchantLocationService.class));
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/admin/commerce/all").param("status", ""))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        verify(commerce).list("all", true, "", 1, 12);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/admin/commerce/all"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        verify(commerce).list("all", true, "PENDING", 1, 12);
+    }
 
     @TempDir
     Path tempDir;

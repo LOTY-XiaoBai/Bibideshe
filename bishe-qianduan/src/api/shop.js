@@ -1,8 +1,8 @@
 import request from './request'
 
 /** 浏览在售广告商品 */
-export function fetchAdList() {
-  return request.get('/api/shop/ad/list')
+export function fetchAdList(keyword = '') {
+  return request.get('/api/shop/ad/list', { params: { keyword } })
 }
 
 /** 广告/商品详情 */
@@ -41,3 +41,5 @@ export function submitFeedback(data) {
 export function submitAfterSale(data) {
   return request.post('/api/shop/order/after-sale', data)
 }
+
+export const deleteMyOrder = id => request.delete(`/api/shop/order/${id}`)

@@ -114,42 +114,6 @@ export function softDeleteAccount(accountType, accountId, reason) {
   })
 }
 
-export function publishAd(data) {
-  return request.post('/api/shop/admin/ad/publish', data)
-}
-
-export function updateAd(data) {
-  return request.post('/api/shop/admin/ad/update', data)
-}
-
-export function deleteAd(adId) {
-  return request.post('/api/shop/admin/ad/delete', null, { params: { adId } })
-}
-
-export function fetchAdminAdList(page = 1, size = 10) {
-  return request.get('/api/shop/admin/ad/list', { params: { page, size } })
-}
-
-export function fetchAdminOrderList(page = 1, size = 10) {
-  return request.get('/api/shop/admin/order/list', { params: { page, size } })
-}
-
-export function fetchPendingOrderCount() {
-  return request.get('/api/shop/admin/order/pending-count')
-}
-
-export function publishLogistics(data) {
-  return request.post('/api/shop/admin/order/logistics', data)
-}
-
-export function fetchAdminEvaluationList(page = 1, size = 10) {
-  return request.get('/api/shop/admin/evaluation/list', { params: { page, size } })
-}
-
-export function replyAfterSale(data) {
-  return request.post('/api/shop/admin/order/after-sale/reply', data)
-}
-
 export function fetchAdminStudents(keyword = '', page = 1, size = 10) {
   return request.get('/api/admin/account/students', { params: { keyword, page, size } })
 }

@@ -21,6 +21,7 @@ export function loginById({ id, password, forceAdmin = false, captchaKey, captch
     [ROLES.STUDENT]: '/api/student/login',
     [ROLES.TEACHER]: '/api/teacher/login',
     [ROLES.ADMIN]: '/api/admin/login',
+    [ROLES.MERCHANT]: '/api/merchant/login',
   }
 
   return request.post(pathMap[role], body)

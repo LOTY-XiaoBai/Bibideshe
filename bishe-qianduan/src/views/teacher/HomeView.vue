@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <AdCarousel />
     <section class="hero">
       <div class="hero__text">
         <p class="hero__hello">欢迎回来</p>
@@ -40,6 +41,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import CommunityFeed from '@/components/CommunityFeed.vue'
+import AdCarousel from '@/components/AdCarousel.vue'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()

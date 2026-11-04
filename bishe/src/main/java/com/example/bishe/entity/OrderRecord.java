@@ -12,6 +12,10 @@ import java.time.LocalDateTime;
 public class OrderRecord {
 
     private Long orderId;
+    private Long merchantId;
+    private String productTitle;
+    private java.math.BigDecimal unitPrice;
+    private String shipOrigin;
     private String shippingSnapshot;
     private LocalDateTime receivedTime;
 

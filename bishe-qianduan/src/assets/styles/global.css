@@ -37,6 +37,15 @@
   --theme-hover-bg: rgba(102, 204, 255, 0.1);
 }
 
+[data-role='merchant'] {
+  --theme-primary: #3f6648;
+  --theme-secondary: #b99050;
+  --theme-gradient: linear-gradient(135deg, #3f6648, #b99050);
+  --theme-shadow: 0 10px 35px -10px #405c3b30;
+  --theme-active-bg: #edf1e4;
+  --theme-hover-bg: #eff3e8;
+}
+
 *,
 *::before,
 *::after {

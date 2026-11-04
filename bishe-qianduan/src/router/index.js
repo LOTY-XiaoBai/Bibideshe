@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { getToken, getRole } from "@/utils/auth";
+import { getToken, getRole, getProfile } from "@/utils/auth";
 import { ROLES, roleHomePath } from "@/utils/role";
 
 const routes = [
@@ -87,6 +87,7 @@ const routes = [
     meta: { requiresAuth: true, role: ROLES.STUDENT },
     redirect: "/student/home",
     children: [
+      { path: "shop/merchant/:merchantId", component: () => import("@/views/shared/MerchantHomeView.vue"), meta: { title: "商家主页" } },
       {
         path: "home",
         name: "StudentHome",
@@ -142,6 +143,7 @@ const routes = [
     meta: { requiresAuth: true, role: ROLES.TEACHER },
     redirect: "/teacher/home",
     children: [
+      { path: "shop/merchant/:merchantId", component: () => import("@/views/shared/MerchantHomeView.vue"), meta: { title: "商家主页" } },
       {
         path: "home",
         name: "TeacherHome",
@@ -196,11 +198,26 @@ const routes = [
     ],
   },
   {
+    path: "/merchant",
+    component: () => import('@/layouts/MerchantLayout.vue'),
+    meta: { requiresAuth: true, role: ROLES.MERCHANT },
+    redirect: '/merchant/home',
+    children: [
+      { path: 'home', component: () => import('@/views/merchant/HomeView.vue'), meta: { title: '经营概览' } },
+      { path: 'products', component: () => import('@/views/merchant/CatalogView.vue'), props: { kind: 'products' }, meta: { title: '我的商品' } },
+      { path: 'campaigns', component: () => import('@/views/merchant/CatalogView.vue'), props: { kind: 'campaigns' }, meta: { title: '广告投放' } },
+      { path: 'orders', component: () => import('@/views/merchant/OrdersView.vue'), meta: { title: '订单与物流' } },
+      { path: 'evaluations', component: () => import('@/views/merchant/EvaluationsView.vue'), meta: { title: '买家评价' } },
+      { path: 'settings', component: () => import('@/views/merchant/SettingsView.vue'), meta: { title: '店铺设置' } },
+    ],
+  },
+  {
     path: "/admin",
     component: () => import("@/layouts/AdminLayout.vue"),
     meta: { requiresAuth: true, role: ROLES.ADMIN },
     redirect: "/admin/home",
     children: [
+      { path: 'merchants', component: () => import('@/views/admin/MerchantsView.vue'), meta: { title: '合作方商家' } },
       {
         path: "home",
         name: "AdminHome",
@@ -234,7 +251,7 @@ const routes = [
         path: "ads",
         name: "AdminAds",
         component: () => import("@/views/admin/AdsView.vue"),
-        meta: { title: "广告与订单" },
+        meta: { title: "广告与商品审核" },
       },
       {
         path: "audit",
@@ -276,6 +293,8 @@ router.beforeEach((to) => {
     if (!token) {
       return { path: "/login", query: { redirect: to.fullPath } };
     }
+    if (role === ROLES.MERCHANT && Number(getProfile()?.mustChangePassword) && to.path !== '/merchant/settings') return '/merchant/settings?welcome=1';
+    if (role === ROLES.MERCHANT && !to.path.startsWith('/merchant/')) return roleHomePath(role);
     const requiredRole = to.matched.find((r) => r.meta.role)?.meta.role;
     if (requiredRole && role !== requiredRole) {
       return roleHomePath(role);
