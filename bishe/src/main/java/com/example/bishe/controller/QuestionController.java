@@ -50,7 +50,11 @@ public class QuestionController {
     @Operation(summary = "查询审核通过的公共题库题目")
     @GetMapping("/public")
     public Result<List<QuestionView>> publicQuestions() {
-        AuthContext.requireLogin();
+        var user = AuthContext.requireLogin();
+        if (!com.example.bishe.common.UserRole.TEACHER.equals(user.getRole())
+                && !com.example.bishe.common.UserRole.ADMIN.equals(user.getRole())) {
+            throw new com.example.bishe.common.BusinessException(403, "公共题库仅供教师组卷");
+        }
         return Result.success(questionService.listPublicApproved());
     }
 }

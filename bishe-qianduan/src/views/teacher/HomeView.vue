@@ -52,6 +52,7 @@ const quickLinks = [
   { path: '/teacher/courses', label: '我的授课', desc: '创建课程、结课与班级管理', icon: 'ph ph-books' },
   { path: '/teacher/questions', label: '题库管理', desc: '上传选择题/判断题/解答题', icon: 'ph ph-database' },
   { path: '/teacher/tasks', label: '发布作业/考试', desc: '从题库组卷发布考核', icon: 'ph ph-file-text' },
+  { path: '/teacher/quizzes', label: '预备小测', desc: '提前选题，在课堂中发布', icon: 'ph ph-exam' },
   { path: '/teacher/settings', label: '个人设置', desc: '资料修改与评分详情', icon: 'ph ph-gear' },
 ]
 

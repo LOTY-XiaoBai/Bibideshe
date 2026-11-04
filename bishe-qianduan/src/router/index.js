@@ -95,6 +95,7 @@ const routes = [
       },
       { path: "check-in", component: () => import("@/views/student/TasksView.vue"), meta: { title: "签到" } },
       { path: "live/:sessionId", component: () => import("@/views/student/LiveClassView.vue"), meta: { title: "课程直播" } },
+      { path: "quiz/:quizId", component: () => import("@/views/student/QuizView.vue"), meta: { title: "课堂小测" } },
       {
         path: "courses",
         name: "StudentCourses",
@@ -146,6 +147,7 @@ const routes = [
         meta: { title: "主页概览" },
       },
       { path: "classroom/:courseId", component: () => import("@/views/teacher/ClassroomView.vue"), meta: { title: "上课" } },
+      { path: "quizzes", component: () => import("@/views/teacher/QuizzesView.vue"), meta: { title: "预备小测" } },
       {
         path: "courses",
         name: "TeacherCourses",

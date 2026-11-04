@@ -1,5 +1,6 @@
 <template>
   <div class="app-shell" data-role="student">
+    <StudentQuizOverlay />
     <aside class="sidebar">
       <div class="sidebar__profile" @click="goSettings">
         <div class="sidebar__profile-bg" />
@@ -77,6 +78,7 @@
 </template>
 
 <script setup>
+import StudentQuizOverlay from '@/components/StudentQuizOverlay.vue'
 import { useClassroomNotifications } from '@/stores/classroom'
 const classroom = useClassroomNotifications()
 import CountBadge from '@/components/CountBadge.vue'
@@ -104,7 +106,7 @@ const mainMenus = [
 ]
 
 const studyMenus = [
-  { path: '/student/tasks', label: '考试/作业', icon: 'ph ph-pencil-simple-line' },
+  { path: '/student/tasks', label: '考试/作业/小测', icon: 'ph ph-pencil-simple-line' },
   { path: '/student/check-in', label: '签到', icon: 'ph ph-calendar-check' },
   { path: '/student/error-book', label: '我的错题本', icon: 'ph ph-notebook' },
 ]

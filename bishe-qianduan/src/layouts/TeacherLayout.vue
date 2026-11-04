@@ -95,6 +95,7 @@ const workMenus = [
 ]
 
 const teachMenus = [
+  { path: '/teacher/quizzes', label: '预备小测', icon: 'ph ph-exam' },
   { path: '/teacher/tasks', label: '发布作业/考试', icon: 'ph ph-file-text' },
   { path: '/teacher/grade', label: '人工批阅', icon: 'ph ph-check-square-offset' },
   { path: '/teacher/questions', label: '题库管理', icon: 'ph ph-database' },

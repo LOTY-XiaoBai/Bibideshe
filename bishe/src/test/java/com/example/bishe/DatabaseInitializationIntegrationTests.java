@@ -40,7 +40,7 @@ class DatabaseInitializationIntegrationTests {
    // 人工重复执行新迁移也不能覆盖旧课程配置或报重复列/索引。
    db.update("UPDATE course SET approval_required=1,max_students=30 WHERE course_id=1");
    try(var c=isolated.getConnection()){
-    for(String file:new String[]{"14_course_classroom.sql","15_course_query_indexes.sql"})org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(c,new org.springframework.core.io.support.EncodedResource(new org.springframework.core.io.ClassPathResource("database/migrations/"+file),java.nio.charset.StandardCharsets.UTF_8));
+    for(String file:new String[]{"14_course_classroom.sql","15_course_query_indexes.sql","16_classroom_quizzes.sql"})org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(c,new org.springframework.core.io.support.EncodedResource(new org.springframework.core.io.ClassPathResource("database/migrations/"+file),java.nio.charset.StandardCharsets.UTF_8));
    }
    assertThat(db.queryForObject("SELECT max_students FROM course WHERE course_id=1",Integer.class)).isEqualTo(30);
    initializer.afterPropertiesSet();
@@ -65,7 +65,7 @@ class DatabaseInitializationIntegrationTests {
    db.update("UPDATE special_word SET enabled=0");
    initializer.afterPropertiesSet();assertThat(db.queryForObject("SELECT COUNT(*) FROM student",Long.class)).isEqualTo(1);
    assertThat(db.queryForObject("SELECT COUNT(*) FROM special_word WHERE enabled=1",Long.class)).isZero();
-   assertThat(db.queryForObject("SELECT COUNT(*) FROM app_schema_migration WHERE version LIKE 'auto:%'",Long.class)).isEqualTo(9);
+   assertThat(db.queryForObject("SELECT COUNT(*) FROM app_schema_migration WHERE version LIKE 'auto:%'",Long.class)).isEqualTo(10);
   } finally {
    if(!schema.matches("codex_schema_test_[a-f0-9]{32}"))throw new IllegalStateException("临时库名校验失败");
    original.execute("DROP DATABASE `"+schema+"`");

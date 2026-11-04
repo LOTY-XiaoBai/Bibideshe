@@ -1,0 +1,18 @@
+import request from './request'
+
+export const fetchQuizTemplates = () => request.get('/api/quiz/templates')
+export const fetchQuizTemplate = id => request.get(`/api/quiz/templates/${id}`)
+export const saveQuizTemplate = (id, data) => id ? request.put(`/api/quiz/templates/${id}`, data) : request.post('/api/quiz/templates', data)
+export const deleteQuizTemplate = id => request.delete(`/api/quiz/templates/${id}`)
+export const publishQuiz = (templateId, sessionId) => request.post('/api/quiz/publish', { templateId, sessionId })
+export const fetchTeacherQuizzes = courseId => request.get('/api/quiz/teacher', { params: { courseId } })
+export const fetchStudentQuizzes = () => request.get('/api/quiz/student')
+export const fetchPendingQuizzes = () => request.get('/api/quiz/pending', { silent: true })
+export const fetchQuiz = id => request.get(`/api/quiz/${id}`)
+export const saveQuizDraft = (id, answers) => request.post(`/api/quiz/${id}/draft`, { answers }, { silent: true })
+export const submitQuiz = (id, answers) => request.post(`/api/quiz/${id}/submit`, { answers })
+export const endQuiz = id => request.post(`/api/quiz/${id}/end`)
+export const fetchQuizScores = id => request.get(`/api/quiz/${id}/scores`)
+export const fetchQuizStudent = (id, studentId) => request.get(`/api/quiz/${id}/student/${studentId}`)
+export const gradeQuiz = (id, data) => request.post(`/api/quiz/${id}/grade`, data)
+export const addQuizMistake = (id, questionId, questionType) => request.post(`/api/quiz/${id}/mistakes`, { questionId, questionType })

@@ -14,8 +14,11 @@
       <p class="q-content">{{ item.question?.content || '题目内容缺失' }}</p>
 
       <template v-if="Number(item.question?.questionType) === 1 && item.question?.options?.length">
+        <el-checkbox-group v-if="!readonly && item.question?.multiple" :model-value="String(answers[keyOf(item)] || '').split(',').filter(Boolean)" class="opt-group" @update:model-value="v => setAnswer(item, v.join(','))">
+          <el-checkbox v-for="opt in item.question.options" :key="opt.optionCode" :value="opt.optionCode" class="opt-item">{{ opt.optionCode }}. {{ opt.optionContent }}</el-checkbox>
+        </el-checkbox-group>
         <el-radio-group
-          v-if="!readonly"
+          v-else-if="!readonly"
           :model-value="answers[keyOf(item)]"
           class="opt-group"
           @update:model-value="(v) => setAnswer(item, v)"

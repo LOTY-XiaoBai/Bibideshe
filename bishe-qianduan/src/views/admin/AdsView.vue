@@ -53,11 +53,13 @@
       </el-table>
       <el-pagination
         v-model:current-page="adPage"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
         :total="adTotal"
-        layout="prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         class="pager"
         @current-change="loadAds"
+        @size-change="adPage = 1; loadAds()"
       />
     </section>
 
@@ -96,11 +98,13 @@
       </el-table>
       <el-pagination
         v-model:current-page="orderPage"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
         :total="orderTotal"
-        layout="prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         class="pager"
         @current-change="loadOrders"
+        @size-change="orderPage = 1; loadOrders()"
       />
     </section>
 
@@ -114,11 +118,13 @@
       </el-table>
       <el-pagination
         v-model:current-page="evalPage"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
         :total="evalTotal"
-        layout="prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         class="pager"
         @current-change="loadEvaluations"
+        @size-change="evalPage = 1; loadEvaluations()"
       />
     </section>
 
@@ -166,7 +172,7 @@ import { uploadImage } from '@/api/file'
 const activeTab = ref('ads')
 const loading = ref(false)
 const saving = ref(false)
-const pageSize = 10
+const pageSize = ref(10)
 const pendingCount = ref(0)
 
 const adPage = ref(1)
@@ -297,7 +303,7 @@ async function refreshPendingCount() {
 async function loadAds() {
   loading.value = true
   try {
-    const res = await fetchAdminAdList(adPage.value, pageSize)
+    const res = await fetchAdminAdList(adPage.value, pageSize.value)
     adList.value = pageList(res.data)
     adTotal.value = res.data?.total || 0
   } catch {
@@ -310,7 +316,7 @@ async function loadAds() {
 async function loadOrders() {
   loading.value = true
   try {
-    const res = await fetchAdminOrderList(orderPage.value, pageSize)
+    const res = await fetchAdminOrderList(orderPage.value, pageSize.value)
     orderList.value = pageList(res.data).map(flattenOrder)
     orderTotal.value = res.data?.total || 0
     await refreshPendingCount()
@@ -324,7 +330,7 @@ async function loadOrders() {
 async function loadEvaluations() {
   loading.value = true
   try {
-    const res = await fetchAdminEvaluationList(evalPage.value, pageSize)
+    const res = await fetchAdminEvaluationList(evalPage.value, pageSize.value)
     evaluationList.value = pageList(res.data)
     evalTotal.value = res.data?.total || 0
   } catch {

@@ -82,11 +82,13 @@
       </el-table>
       <el-pagination
         v-model:current-page="page"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
         :total="total"
-        layout="total, prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         class="pager"
         @current-change="loadAccounts"
+        @size-change="page = 1; loadAccounts()"
       />
     </section>
 
@@ -121,7 +123,7 @@ const keyword = ref('')
 const loading = ref(false)
 const creating = ref(false)
 const page = ref(1)
-const pageSize = 10
+const pageSize = ref(10)
 const total = ref(0)
 const accountList = ref([])
 const adminForm = reactive({ password: '' })
@@ -134,7 +136,7 @@ async function loadAccounts() {
   loading.value = true
   try {
     const fetcher = accountType.value === 'teacher' ? fetchAdminTeachers : fetchAdminStudents
-    const res = await fetcher(keyword.value.trim(), page.value, pageSize)
+    const res = await fetcher(keyword.value.trim(), page.value, pageSize.value)
     accountList.value = pageList(res.data)
     total.value = res.data?.total || 0
   } catch {

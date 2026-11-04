@@ -2,8 +2,8 @@
   <div class="page">
     <header class="page__header">
       <div>
-        <h2>{{ isCheckInPage ? '课程签到' : '考试与作业' }}</h2>
-        <p>{{ isCheckInPage ? '完成课堂签到，查看签到和漏签记录' : '参加课程考试，完成并提交作业' }}</p>
+        <h2>{{ isCheckInPage ? '课程签到' : '考试 / 作业 / 小测' }}</h2>
+        <p>{{ isCheckInPage ? '完成课堂签到，查看签到和漏签记录' : '参加课程考核，查看小测成绩、排名和答题复盘' }}</p>
       </div>
     </header>
 
@@ -24,9 +24,11 @@
     <el-tabs v-if="!isCheckInPage" v-model="activeTab">
       <el-tab-pane label="考试" name="exam" />
       <el-tab-pane label="作业" name="homework" />
+      <el-tab-pane label="小测" name="quiz" />
     </el-tabs>
 
     <!-- 考试 -->
+    <StudentQuizList v-if="!isCheckInPage && activeTab === 'quiz'" :course-id="selectedCourseId" />
     <section v-show="activeTab === 'exam'" v-loading="loading">
       <div v-if="!selectedCourseId" class="empty">请先选择课程</div>
       <div v-else-if="!exams.length" class="empty">该课程暂无考试</div>
@@ -256,12 +258,14 @@ import {
   fetchAllMissed,
 } from '@/api/checkIn'
 import QuestionPaper from '@/components/QuestionPaper.vue'
+import StudentQuizList from '@/components/StudentQuizList.vue'
 
 const userStore = useUserStore()
 
 const route = useRoute(), classroom = useClassroomStore()
 const isCheckInPage = computed(() => route.path === '/student/check-in')
-const activeTab = ref(isCheckInPage.value ? 'checkin' : 'exam')
+const activeTab = ref(isCheckInPage.value ? 'checkin' : route.query.tab === 'quiz' ? 'quiz' : 'exam')
+watch(() => route.query.tab, value => { if (value === 'quiz' && !isCheckInPage.value) activeTab.value = 'quiz' })
 watch(isCheckInPage, value => { activeTab.value = value ? 'checkin' : 'exam'; if (value) { selectedCourseId.value = 0; loadCheckinData() } })
 const checkinSubTab = ref('active')
 const loading = ref(false)

@@ -14,12 +14,13 @@
       <div class="self-preview"><div v-if="!hasCamera && !screen" class="preview-empty"><i aria-hidden="true" class="ph ph-video-camera-slash" /><span>教师画面预览</span></div><div v-if="screen" class="preview-tile"><StreamVideo :stream="screen" muted /><span>屏幕共享</span></div><div v-if="hasCamera" class="preview-tile camera-preview"><StreamVideo :stream="camera" muted /><span>摄像头</span></div></div>
     </section>
 
-    <div class="module-tabs"><button :class="{ selected: module === 'roll' }" @click="module = 'roll'"><i aria-hidden="true" class="ph ph-users-three" /> 随机点名</button><button :class="{ selected: module === 'checkin' }" @click="module = 'checkin'"><i aria-hidden="true" class="ph ph-calendar-check" /> 发布签到</button></div>
+    <div class="module-tabs"><button :class="{ selected: module === 'roll' }" @click="module = 'roll'"><i aria-hidden="true" class="ph ph-users-three" /> 随机点名</button><button :class="{ selected: module === 'checkin' }" @click="module = 'checkin'"><i aria-hidden="true" class="ph ph-calendar-check" /> 发布签到</button><button :class="{ selected: module === 'quiz' }" @click="module = 'quiz'"><i aria-hidden="true" class="ph ph-exam" /> 发布小测</button></div>
     <section v-show="module === 'roll'" class="roll-panel">
       <div class="roll-toolbar"><div><h3>课堂随机点名</h3><p>共 {{ members.length }} 位学生，每轮抽取的学生不重复</p></div><div class="draw-controls"><span>一次抽取</span><el-input-number v-model="drawCount" :min="1" :max="Math.max(1, members.length)" :precision="0" /><el-button type="primary" :disabled="!teaching || !members.length" :loading="drawing" @click="draw">{{ selected.length ? '再抽一次' : '开始点名' }}</el-button></div></div>
       <div class="draw-stage" aria-live="polite"><div v-if="!selected.length" class="draw-empty"><i aria-hidden="true" class="ph ph-student" /><p>{{ teaching ? '点击开始点名，随机抽取课堂成员' : '开始上课后即可点名' }}</p></div><div v-for="person in selected" :key="person.studentId" class="student-spot"><el-avatar :size="100" :src="person.avatar">{{ (person.nickname || '学生').slice(0, 1) }}</el-avatar><strong>{{ person.nickname || person.studentId }}</strong><span>{{ person.studentId }}</span></div></div>
     </section>
     <ClassCheckInPanel v-if="course" v-show="module === 'checkin'" :course-id="course.courseId" :active="teaching" />
+    <ClassQuizPanel v-if="course" v-show="module === 'quiz'" :course-id="course.courseId" :session-id="session?.sessionId" :active="teaching" />
   </div>
 </template>
 
@@ -31,6 +32,7 @@ import { fetchTeacherCourses, fetchCourseMembers } from '@/api/course'
 import { activeClass, startClass, heartbeatClass, endClass } from '@/api/classroom'
 import { createClassroomRtc } from '@/utils/classroomRtc'
 import ClassCheckInPanel from '@/components/ClassCheckInPanel.vue'
+import ClassQuizPanel from '@/components/ClassQuizPanel.vue'
 import StreamVideo from '@/components/StreamVideo.vue'
 
 const route = useRoute(), router = useRouter()

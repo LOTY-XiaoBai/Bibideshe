@@ -438,6 +438,11 @@ public class CourseService {
         // 1. 考试部分
         BigDecimal examScoreSum = coursePersonnelMapper.getExamScoreSumByCourseAndStudent(courseId, studentId);
         BigDecimal examMaxSum = coursePersonnelMapper.getExamMaxScoreSumByCourse(courseId);
+        // 仅已结束且勾选计分的小测进入考试考核部分；未勾选的小测不改变分母。
+        BigDecimal quizEarned = jdbc.queryForObject("SELECT COALESCE(SUM(s.score),0) FROM classroom_quiz q JOIN classroom_quiz_student s ON s.quiz_id=q.id WHERE q.course_id=? AND s.student_id=? AND q.count_score=1 AND q.ended_at IS NOT NULL", BigDecimal.class,courseId,studentId);
+        BigDecimal quizMax = jdbc.queryForObject("SELECT COALESCE(SUM(q.max_score),0) FROM classroom_quiz q WHERE q.course_id=? AND q.count_score=1 AND q.ended_at IS NOT NULL", BigDecimal.class,courseId);
+        examScoreSum = (examScoreSum == null ? BigDecimal.ZERO : examScoreSum).add(quizEarned);
+        examMaxSum = (examMaxSum == null ? BigDecimal.ZERO : examMaxSum).add(quizMax);
         boolean hasExam = examMaxSum != null && examMaxSum.compareTo(BigDecimal.ZERO) > 0;
 
         // 2. 作业部分

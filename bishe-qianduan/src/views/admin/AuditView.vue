@@ -26,9 +26,11 @@
 
     <el-pagination
       v-model:current-page="page"
-      :page-size="pageSize"
+      v-model:page-size="pageSize"
+      :page-sizes="[10, 20, 50]"
       :total="list.length"
-      layout="total, prev, pager, next"
+      layout="total, sizes, prev, pager, next"
+      @size-change="page = 1"
       class="pager"
     />
   </div>
@@ -43,11 +45,11 @@ import { questionTypeLabel } from '@/utils/question'
 const loading = ref(false)
 const list = ref([])
 const page = ref(1)
-const pageSize = 10
+const pageSize = ref(10)
 
 const pageData = computed(() => {
-  const start = (page.value - 1) * pageSize
-  return list.value.slice(start, start + pageSize)
+  const start = (page.value - 1) * pageSize.value
+  return list.value.slice(start, start + pageSize.value)
 })
 
 async function loadList() {
@@ -55,7 +57,7 @@ async function loadList() {
   try {
     const res = await fetchPendingQuestions()
     list.value = res.data || []
-    page.value = 1
+    page.value = Math.max(1, Math.min(page.value, Math.ceil(list.value.length / pageSize.value) || 1))
   } catch {
     list.value = []
   } finally {

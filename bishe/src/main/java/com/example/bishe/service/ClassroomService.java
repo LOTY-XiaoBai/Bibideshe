@@ -19,9 +19,11 @@ public class ClassroomService {
     private final CourseMapper courses;
     private final CoursePersonnelMapper members;
     private final SimpMessagingTemplate messaging;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
-    public ClassroomService(JdbcTemplate jdbc, CourseMapper courses, CoursePersonnelMapper members, SimpMessagingTemplate messaging) {
+    public ClassroomService(JdbcTemplate jdbc, CourseMapper courses, CoursePersonnelMapper members, SimpMessagingTemplate messaging, org.springframework.context.ApplicationEventPublisher events) {
         this.jdbc = jdbc; this.courses = courses; this.members = members; this.messaging = messaging;
+        this.events = events;
     }
 
     public Course owned(Long teacherId, Long courseId) {
@@ -94,6 +96,7 @@ public class ClassroomService {
     }
 
     public void endForCourse(Long courseId) {
+        events.publishEvent(new ClassroomEndedEvent(courseId));
         var rows = jdbc.queryForList("SELECT session_id AS sessionId FROM course_session WHERE course_id=? AND ended_at IS NULL", courseId);
         jdbc.update("UPDATE course_session SET ended_at=CURRENT_TIMESTAMP WHERE course_id=? AND ended_at IS NULL", courseId);
         jdbc.update("UPDATE check_in_record SET status=1,end_time=CURRENT_TIMESTAMP WHERE course_id=? AND status=0", courseId);

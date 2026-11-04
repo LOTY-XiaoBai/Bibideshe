@@ -39,11 +39,13 @@
       </el-table>
       <el-pagination
         v-model:current-page="page"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
         :total="total"
-        layout="total, prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         class="pager"
         @current-change="loadCourses"
+        @size-change="page = 1; loadCourses()"
       />
     </section>
   </div>
@@ -59,7 +61,7 @@ const courseList = ref([])
 const loading = ref(false)
 const deletingId = ref(null)
 const page = ref(1)
-const pageSize = 10
+const pageSize = ref(10)
 const total = ref(0)
 
 function pageList(data) {
@@ -69,7 +71,7 @@ function pageList(data) {
 async function loadCourses() {
   loading.value = true
   try {
-    const res = await fetchAdminCourses(keyword.value.trim(), page.value, pageSize)
+    const res = await fetchAdminCourses(keyword.value.trim(), page.value, pageSize.value)
     courseList.value = pageList(res.data)
     total.value = res.data?.total || 0
   } catch {

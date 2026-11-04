@@ -32,7 +32,7 @@ const userStore = useUserStore()
 const quickLinks = [
   { path: '/student/courses', label: '我的课程', desc: '选课、成绩与班级', icon: 'ph ph-books' },
   { path: '/student/error-book', label: '我的错题本', desc: '自动收录的错题复习', icon: 'ph ph-notebook' },
-  { path: '/student/tasks', label: '考试与作业', desc: '待办学习任务', icon: 'ph ph-pencil-simple-line' },
+  { path: '/student/tasks', label: '考试/作业/小测', desc: '待办任务、成绩与答题复盘', icon: 'ph ph-pencil-simple-line' },
   { path: '/student/settings', label: '个人设置', desc: '资料与课程得分', icon: 'ph ph-gear' },
 ]
 </script>
