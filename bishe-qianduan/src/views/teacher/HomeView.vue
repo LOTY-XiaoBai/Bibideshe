@@ -13,7 +13,7 @@
           <span>/ 10</span>
         </div>
         <div v-else class="rating-card__empty">{{ scoreTip || '暂未有人打分' }}</div>
-        <p class="rating-card__meta">已开课程 {{ courseCount }} / 3</p>
+        <p class="rating-card__meta">进行中课程 {{ courseCount }} / 5</p>
       </div>
     </section>
 

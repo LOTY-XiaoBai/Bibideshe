@@ -14,6 +14,11 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public org.springframework.http.ResponseEntity<Result<Void>> handleMissingResource() {
+        return org.springframework.http.ResponseEntity.status(404).body(Result.error(404, "资源不存在"));
+    }
+
     @ExceptionHandler(BusinessException.class)
     @SuppressWarnings("unchecked")
     public Result<Object> handleBusinessException(BusinessException e) {

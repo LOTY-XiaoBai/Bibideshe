@@ -18,6 +18,7 @@ public class UnreadService {
             result.put("questions",questions);return result;
         }
         long id=AuthContext.requireUserId();
+        if(UserRole.TEACHER.equals(AuthContext.requireLogin().getRole())) result.put("courseApplications",count("SELECT COUNT(*) FROM course_application a JOIN course c ON c.course_id=a.course_id WHERE c.teacher_id=? AND a.status='PENDING'",id));
         result.put("private",db.queryForList("SELECT c.sender_id target_id,COUNT(*) unread FROM chat_record c LEFT JOIN chat_read_cursor r ON r.owner=? AND r.kind='private' AND r.target_id=c.sender_id WHERE c.receiver_id=? AND c.is_private=1 AND c.is_deleted=0 AND c.message_id>COALESCE(r.last_message_id,0) AND (c.sender_id=0 OR EXISTS(SELECT 1 FROM friend f WHERE (f.friend_a_id=? AND f.friend_b_id=c.sender_id) OR (f.friend_b_id=? AND f.friend_a_id=c.sender_id))) GROUP BY c.sender_id",owner,id,id,id));
         result.put("groups",db.queryForList("SELECT c.group_id target_id,COUNT(*) unread FROM chat_record c JOIN group_user gu ON gu.group_id=c.group_id AND gu.user_id=? JOIN group_chat g ON g.group_id=c.group_id LEFT JOIN chat_read_cursor r ON r.owner=? AND r.kind='group' AND r.target_id=c.group_id WHERE c.is_private=0 AND c.is_deleted=0 AND c.sender_id<>? AND g.is_dissolved=0 AND g.is_deleted=0 AND g.is_banned=0 AND c.message_id>COALESCE(r.last_message_id,0) GROUP BY c.group_id",id,owner,id));
         result.put("requests",count("SELECT COUNT(*) FROM friend_request WHERE receiver_id=? AND status=0",id));

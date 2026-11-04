@@ -23,6 +23,9 @@ public interface TeacherMapper {
     @Select("SELECT * FROM teacher WHERE teacher_id = #{teacherId}")
     Teacher findById(Long teacherId);
 
+    @Select("SELECT COUNT(*) FROM course WHERE teacher_id = #{teacherId} AND IFNULL(is_finished,0)=0")
+    int countActiveCourses(Long teacherId);
+
     /**
      * 按教师ID列表批量查询。
      */

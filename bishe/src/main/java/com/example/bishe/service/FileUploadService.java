@@ -47,6 +47,18 @@ public class FileUploadService {
     public String uploadFile(MultipartFile file) {
         return store(file, ALLOWED_FILE_EXT, "file");
     }
+    public String uploadCourseMaterial(MultipartFile file) {
+        String url=store(file,ALLOWED_FILE_EXT,"private/course-materials");
+        return url.substring(url.lastIndexOf('/')+1);
+    }
+    public Path courseMaterialPath(String name) {
+        if(name==null || !name.matches("[a-f0-9]{32}\\.[a-z0-9]{2,5}"))throw new BusinessException("资料存储名无效");
+        return resolveUploadRoot().resolve("private/course-materials").resolve(name).normalize();
+    }
+    public void deleteCourseMaterial(String name) {
+        try { Files.deleteIfExists(courseMaterialPath(name)); }
+        catch(IOException e) { org.slf4j.LoggerFactory.getLogger(FileUploadService.class).warn("课程资料清理失败: {}",name); }
+    }
 
     private String store(MultipartFile file, Set<String> allowedExt, String subDir) {
         if (file == null || file.isEmpty()) {
@@ -69,7 +81,9 @@ public class FileUploadService {
         try {
             Files.createDirectories(dir);
             Path target = dir.resolve(filename);
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            try (InputStream input = file.getInputStream()) {
+                Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             throw new BusinessException("文件保存失败，请稍后重试");
         }

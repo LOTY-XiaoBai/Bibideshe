@@ -58,8 +58,8 @@
         </div>
         <div class="rating-meta">
           <div>
-            <span>已开课程</span>
-            <strong>{{ courseCount }} / 3</strong>
+            <span>进行中课程</span>
+            <strong>{{ courseCount }} / 5</strong>
           </div>
           <div>
             <span>评分状态</span>

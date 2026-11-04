@@ -246,7 +246,7 @@
               class="bubble-avatar"
             />
           </div>
-          <p v-if="!messagesLoading && !messages.length" class="empty-tip center">暂无消息，打个招呼吧</p>
+          <p v-if="!isSystemSession && !messagesLoading && !messages.length" class="empty-tip center">暂无消息，打个招呼吧</p>
         </div>
 
         <footer v-if="!isSystemSession" class="composer">
@@ -288,7 +288,6 @@
       <div v-else class="chat-empty">
         <i class="ph ph-chats-circle" />
         <h3>选择好友或群聊开始沟通</h3>
-        <p>支持文本、图片、引用回复与消息撤回；实时消息经 WebSocket 推送</p>
       </div>
     </section>
 

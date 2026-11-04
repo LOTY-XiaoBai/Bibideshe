@@ -29,11 +29,12 @@
             cp.student_id AS studentId,
             s.nickname AS nickname,
             s.avatar AS avatar,
+            cp.joined_at AS joinedAt,
             cp.student_score AS studentScore
         FROM course_personnel cp
         LEFT JOIN student s ON cp.student_id = s.student_id
         WHERE cp.course_id = #{courseId}
-        ORDER BY cp.student_id
+        ORDER BY cp.joined_at, cp.student_id
     </select>
 
     <select id="findByStudentId" resultMap="CoursePersonnelResultMap">

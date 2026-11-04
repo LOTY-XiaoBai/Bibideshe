@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 public class CourseService {
 
     /** 单个教师可创建的课程数量上限 */
-    private static final int MAX_COURSE_PER_TEACHER = 3;
+    private static final int MAX_COURSE_PER_TEACHER = 5;
 
     private static final int NOT_FINISHED = 0;
     private static final int FINISHED = 1;
@@ -44,12 +44,13 @@ public class CourseService {
     private final CascadeMapper cascadeMapper;
     private final JdbcTemplate jdbc;
     private final ClassroomService classroom;
+    private final CourseFilesService courseFiles;
 
     public CourseService(CourseMapper courseMapper,
                          CoursePersonnelMapper coursePersonnelMapper,
                          TeacherMapper teacherMapper,
                          StudentMapper studentMapper,
-                         CascadeMapper cascadeMapper, JdbcTemplate jdbc, ClassroomService classroom) {
+                         CascadeMapper cascadeMapper, JdbcTemplate jdbc, ClassroomService classroom, CourseFilesService courseFiles) {
         this.courseMapper = courseMapper;
         this.coursePersonnelMapper = coursePersonnelMapper;
         this.teacherMapper = teacherMapper;
@@ -57,12 +58,13 @@ public class CourseService {
         this.cascadeMapper = cascadeMapper;
         this.jdbc = jdbc;
         this.classroom = classroom;
+        this.courseFiles = courseFiles;
     }
 
     // ==================== 教师端 ====================
 
     /**
-     * 教师创建课程。校验课程数量上限为3, 建课后教师表 course_count +1。
+     * 教师创建课程。最多同时进行5门，结束的课程不占名额。
      */
     @Transactional
     public Course createCourse(CourseCreateRequest request) {
@@ -72,6 +74,7 @@ public class CourseService {
         if (!StringUtils.hasText(request.getCourseName())) {
             throw new BusinessException("课程名称不能为空");
         }
+        jdbc.queryForList("SELECT teacher_id FROM teacher WHERE teacher_id=? FOR UPDATE",request.getTeacherId());
         if (teacherMapper.findById(request.getTeacherId()) == null) {
             throw new BusinessException("教师不存在");
         }
@@ -99,6 +102,9 @@ public class CourseService {
             throw new BusinessException("课堂人数上限应为1至10000人");
         }
         course.setMaxStudents(request.getMaxStudents());
+        if (request.getCoverUrl()!=null && !request.getCoverUrl().isBlank() && !request.getCoverUrl().matches("/uploads/image/[a-f0-9]{32}\\.(png|jpg|jpeg|gif|webp|bmp)")) throw new BusinessException("课程封面地址无效");
+        course.setCoverUrl(request.getCoverUrl());
+        course.setShowStudentRanking(!Boolean.FALSE.equals(request.getShowStudentRanking()));
         course.setIsFinished(NOT_FINISHED);
         courseMapper.insert(course);
 
@@ -128,10 +134,13 @@ public class CourseService {
      */
     @Transactional
     public void unfinishCourse(Long teacherId, Long courseId) {
+        jdbc.queryForList("SELECT teacher_id FROM teacher WHERE teacher_id=? FOR UPDATE",teacherId);
+        courseMapper.findByIdForUpdate(courseId);
         Course course = requireOwnedCourse(teacherId, courseId);
         if (course.getIsFinished() == null || course.getIsFinished() == NOT_FINISHED) {
             throw new BusinessException("课程尚未结束, 请勿重复操作");
         }
+        if(courseMapper.countActiveByTeacherId(teacherId)>=MAX_COURSE_PER_TEACHER)throw new BusinessException("进行中的课程最多5门，请先结束其他课程");
         courseMapper.updateFinished(courseId, NOT_FINISHED);
         // 课程恢复为进行中后重算所有学生的综合评分(该课程不再计入)
         updateComprehensiveScoreForAllStudentsInCourse(courseId);
@@ -142,6 +151,7 @@ public class CourseService {
      */
     @Transactional
     public void deleteCourseByTeacher(Long teacherId, Long courseId) {
+        jdbc.queryForList("SELECT teacher_id FROM teacher WHERE teacher_id=? FOR UPDATE",teacherId);
         requireOwnedCourse(teacherId, courseId);
         deleteCourseCascade(courseId);
         teacherMapper.decrementCourseCount(teacherId);
@@ -205,7 +215,7 @@ public class CourseService {
         if (Boolean.TRUE.equals(course.getApprovalRequired())) {
             var status = jdbc.queryForList("SELECT status FROM course_application WHERE course_id=? AND student_id=?", String.class, courseId, studentId);
             if (status.contains("PENDING")) throw new BusinessException("申请已提交，请等待教师审核");
-            jdbc.update("INSERT INTO course_application(course_id,student_id,status) VALUES(?,?,'PENDING') ON DUPLICATE KEY UPDATE status='PENDING',applied_at=CURRENT_TIMESTAMP,reviewed_at=NULL", courseId, studentId);
+            jdbc.update("INSERT INTO course_application(course_id,student_id,status) VALUES(?,?,'PENDING') ON DUPLICATE KEY UPDATE status='PENDING',applied_at=CURRENT_TIMESTAMP,reviewed_at=NULL,student_hidden=0", courseId, studentId);
             return "申请已提交，等待教师审核";
         }
         enroll(courseId, studentId);
@@ -227,7 +237,7 @@ public class CourseService {
 
     public List<Map<String, Object>> applications(Long userId, boolean teacher) {
         String filter = teacher ? "c.teacher_id=? AND a.status='PENDING'" : "a.student_id=?";
-        return jdbc.queryForList("SELECT a.course_id AS courseId,a.student_id AS studentId,a.status,a.applied_at AS appliedAt,c.course_name AS courseName,s.nickname,s.avatar FROM course_application a JOIN course c ON c.course_id=a.course_id JOIN student s ON s.student_id=a.student_id WHERE " + filter + " ORDER BY a.applied_at DESC", userId);
+        return jdbc.queryForList("SELECT a.course_id AS courseId,a.student_id AS studentId,a.status,a.student_hidden AS studentHidden,a.applied_at AS appliedAt,c.course_name AS courseName,s.nickname,s.avatar FROM course_application a JOIN course c ON c.course_id=a.course_id JOIN student s ON s.student_id=a.student_id WHERE " + filter + " ORDER BY a.applied_at DESC", userId);
     }
 
     @Transactional
@@ -555,6 +565,7 @@ public class CourseService {
     @Transactional
     public void deleteCourseCascade(Long courseId) {
         courseMapper.findByIdForUpdate(courseId);
+        courseFiles.deleteForCourse(courseId);
         classroom.endForCourse(courseId);
         jdbc.update("DELETE FROM course_application WHERE course_id=?", courseId);
         jdbc.update("DELETE FROM course_session WHERE course_id=?", courseId);

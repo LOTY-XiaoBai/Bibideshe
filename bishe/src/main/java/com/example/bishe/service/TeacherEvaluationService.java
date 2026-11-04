@@ -50,7 +50,7 @@ public class TeacherEvaluationService {
     }
 
     /**
-     * 学生通过自己选修的课程给该课教师打分。同一学生对同一教师仅保留最新一次评分。
+     * 学生通过已结课的选修课程给主讲教师打分，同一学生对同一教师仅可评分一次。
      */
     @Transactional
     public TeacherScoreVO rateTeacher(Long studentId, TeacherRateRequest request) {
@@ -70,10 +70,11 @@ public class TeacherEvaluationService {
         // 允许整数或一位小数
         score = score.setScale(1, RoundingMode.HALF_UP);
 
-        Course course = courseMapper.findById(request.getCourseId());
+        Course course = courseMapper.findByIdForUpdate(request.getCourseId());
         if (course == null) {
             throw new BusinessException("课程不存在");
         }
+        if (!Integer.valueOf(1).equals(course.getIsFinished())) throw new BusinessException("课程结课后才能给教师打分");
         if (!course.getTeacherId().equals(request.getTeacherId())) {
             throw new BusinessException("该教师不是本课程主讲教师");
         }
@@ -96,9 +97,7 @@ public class TeacherEvaluationService {
             evaluation.setScore(score);
             teacherEvaluationMapper.insert(evaluation);
         } else {
-            existing.setScore(score);
-            existing.setCourseId(request.getCourseId());
-            teacherEvaluationMapper.updateScore(existing);
+            throw new BusinessException("您已给该教师打分，不能重复评分");
         }
 
         refreshTeacherComprehensiveScore(request.getTeacherId());

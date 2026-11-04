@@ -18,4 +18,6 @@ public class CourseCreateRequest {
     private String classTime;
     private Boolean approvalRequired;
     private Integer maxStudents;
+    private String coverUrl;
+    private Boolean showStudentRanking;
 }

@@ -24,4 +24,8 @@ public class Course {
     private String classTime;
     private Boolean approvalRequired;
     private Integer maxStudents;
+    private String coverUrl;
+    private Boolean showStudentRanking;
+    private Integer memberCount;
+    private Integer pendingApplications;
 }

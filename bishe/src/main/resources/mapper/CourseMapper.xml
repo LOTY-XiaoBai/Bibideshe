@@ -13,23 +13,32 @@
         <result column="class_time" property="classTime"/>
         <result column="approval_required" property="approvalRequired"/>
         <result column="max_students" property="maxStudents"/>
+        <result column="cover_url" property="coverUrl"/>
+        <result column="show_student_ranking" property="showStudentRanking"/>
+        <result column="member_count" property="memberCount"/>
+        <result column="pending_applications" property="pendingApplications"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.example.bishe.entity.Course"
             useGeneratedKeys="true" keyProperty="courseId">
-        INSERT INTO course (teacher_id, course_name, is_finished, fixed_schedule, class_weekday, class_time, approval_required, max_students)
-        VALUES (#{teacherId}, #{courseName}, #{isFinished}, #{fixedSchedule}, #{classWeekday}, #{classTime}, #{approvalRequired}, #{maxStudents})
+        INSERT INTO course (teacher_id, course_name, is_finished, fixed_schedule, class_weekday, class_time, approval_required, max_students, cover_url, show_student_ranking)
+        VALUES (#{teacherId}, #{courseName}, #{isFinished}, #{fixedSchedule}, #{classWeekday}, #{classTime}, #{approvalRequired}, #{maxStudents}, #{coverUrl}, #{showStudentRanking})
     </insert>
 
     <select id="findById" resultMap="CourseResultMap">
         SELECT * FROM course WHERE course_id = #{courseId}
     </select>
+    <update id="updateSettings">
+        UPDATE course SET course_name=#{courseName}, fixed_schedule=#{fixedSchedule}, class_weekday=#{classWeekday},
+        class_time=#{classTime}, approval_required=#{approvalRequired}, max_students=#{maxStudents},
+        cover_url=#{coverUrl}, show_student_ranking=#{showStudentRanking} WHERE course_id=#{courseId}
+    </update>
     <select id="findByIdForUpdate" resultMap="CourseResultMap">
         SELECT * FROM course WHERE course_id = #{courseId} FOR UPDATE
     </select>
 
     <select id="findByIds" resultMap="CourseResultMap">
-        SELECT * FROM course
+        SELECT c.*,(SELECT COUNT(*) FROM course_personnel p WHERE p.course_id=c.course_id) member_count FROM course c
         WHERE course_id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
@@ -37,7 +46,9 @@
     </select>
 
     <select id="findByTeacherId" resultMap="CourseResultMap">
-        SELECT * FROM course WHERE teacher_id = #{teacherId} ORDER BY course_id
+        SELECT c.*,(SELECT COUNT(*) FROM course_personnel p WHERE p.course_id=c.course_id) member_count,
+        (SELECT COUNT(*) FROM course_application a WHERE a.course_id=c.course_id AND a.status='PENDING') pending_applications
+        FROM course c WHERE c.teacher_id = #{teacherId} ORDER BY c.course_id
     </select>
 
     <select id="countByTeacherId" resultType="int">

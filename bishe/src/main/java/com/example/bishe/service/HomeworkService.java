@@ -206,7 +206,9 @@ public class HomeworkService {
         if (studentId == null) {
             throw new BusinessException("学生ID不能为空");
         }
-        return userHomeworkRecordMapper.findByStudentId(studentId);
+        var records=userHomeworkRecordMapper.findByStudentId(studentId);
+        for(var record:records){var homework=homeworkMapper.findById(record.getHomeworkId());if(homework!=null && !canStudentViewResult(homework)){record.setHomeworkScore(null);record.setTeacherScore(null);}}
+        return records;
     }
 
     /** 学生查看自己某次作业的作答复盘(提交后可反复查看) */
@@ -334,7 +336,7 @@ public class HomeworkService {
                 answer.setScore(hq.getScore());
             } else {
                 answer.setScore(BigDecimal.ZERO);
-                addToErrorBook(request.getStudentId(), hq.getQuestionId(), hq.getQuestionType());
+                if (canStudentViewResult(homework)) addToErrorBook(request.getStudentId(), hq.getQuestionId(), hq.getQuestionType());
             }
 
             homeworkQuestionAnswerMapper.insert(answer);
@@ -421,7 +423,7 @@ public class HomeworkService {
         answer.setAnnotation(resolveGradedAnnotation(request.getAnnotation()));
         homeworkQuestionAnswerMapper.updateScore(answer);
 
-        if (request.getScore().compareTo(hq.getScore()) < 0) {
+        if (request.getScore().compareTo(hq.getScore()) < 0 && canStudentViewResult(homework)) {
             addToErrorBook(request.getStudentId(), request.getQuestionId(), request.getQuestionType());
         }
 

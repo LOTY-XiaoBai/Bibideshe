@@ -35,10 +35,12 @@ public class CourseController {
 
     private final CourseService courseService;
     private final ScoreCompareService scoreCompareService;
+    private final com.example.bishe.service.CourseWorkspaceService workspace;
 
-    public CourseController(CourseService courseService, ScoreCompareService scoreCompareService) {
+    public CourseController(CourseService courseService, ScoreCompareService scoreCompareService, com.example.bishe.service.CourseWorkspaceService workspace) {
         this.courseService = courseService;
         this.scoreCompareService = scoreCompareService;
+        this.workspace = workspace;
     }
 
     // ==================== 教师端 ====================
@@ -158,8 +160,7 @@ public class CourseController {
     /** 查询课程的班级成员 */
     @GetMapping("/{courseId}/members")
     public Result<List<CourseMemberVO>> members(@PathVariable Long courseId) {
-        AuthContext.requireLogin();
-        return Result.success(courseService.listMembers(courseId));
+        return Result.success(workspace.members(AuthContext.requireLogin(),courseId));
     }
 
     // ==================== 学生成绩 ====================

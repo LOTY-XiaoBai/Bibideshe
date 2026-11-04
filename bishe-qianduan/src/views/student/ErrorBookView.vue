@@ -3,7 +3,7 @@
     <header class="page__header">
       <div>
         <h2>我的错题本</h2>
-        <p>提交考试/作业答错时系统自动收录；此处仅展示题目内容，不含当时作答选项</p>
+        <p>可从考试、作业或小测复盘中勾选收录，集中整理需要巩固的题目</p>
       </div>
       <el-button text :loading="loading" @click="loadList">刷新</el-button>
     </header>
@@ -11,7 +11,7 @@
     <el-skeleton v-if="loading && !items.length" :rows="5" animated />
 
     <div v-else-if="!items.length" class="empty">
-      错题本暂无内容。完成作业或考试后，答错的题目会自动出现在这里。
+      错题本暂无内容，可在考试、作业或小测复盘中点击“加入错题本”收录题目。
     </div>
 
     <div v-else class="list">

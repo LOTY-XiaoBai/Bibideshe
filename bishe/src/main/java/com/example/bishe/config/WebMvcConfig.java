@@ -57,7 +57,15 @@ public class WebMvcConfig implements WebMvcConfigurer {
             location = location + "/";
         }
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations(location);
+                .addResourceLocations(location).resourceChain(true)
+                .addResolver(new org.springframework.web.servlet.resource.PathResourceResolver() {
+                    @Override protected org.springframework.core.io.Resource getResource(String path, org.springframework.core.io.Resource root) throws java.io.IOException {
+                        String normalized=org.springframework.util.StringUtils.cleanPath(path.replace('\\','/'));
+                        String checked=normalized.toLowerCase(java.util.Locale.ROOT);
+                        if(checked.equals("private") || checked.startsWith("private/"))return null;
+                        return super.getResource(path,root);
+                    }
+                });
     }
 
     @Override

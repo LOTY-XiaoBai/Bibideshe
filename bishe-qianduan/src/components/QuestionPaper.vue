@@ -6,6 +6,7 @@
       class="q-block"
     >
       <header class="q-block__head">
+        <button v-if="selectionMode" type="button" role="checkbox" class="question-picker" :class="{ checked: selectedKeys.includes(keyOf(item)) }" :aria-checked="selectedKeys.includes(keyOf(item))" :aria-label="`选择第${idx + 1}题`" :disabled="item.question?.lost" @click="toggleSelected(item)"><i v-if="selectedKeys.includes(keyOf(item))" class="ph ph-check" aria-hidden="true" /></button>
         <span class="q-index">{{ idx + 1 }}</span>
         <el-tag size="small">{{ questionTypeLabel(item.question?.questionType) }}</el-tag>
         <span class="q-score">{{ formatScore(item.score) }} 分</span>
@@ -88,9 +89,15 @@ const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
   readonly: { type: Boolean, default: false },
   reviewItems: { type: Array, default: () => [] },
+  selectionMode: Boolean,
+  selectedKeys: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'update:selectedKeys'])
+function toggleSelected(item) {
+  const key=keyOf(item)
+  emit('update:selectedKeys',props.selectedKeys.includes(key)?props.selectedKeys.filter(k=>k!==key):[...props.selectedKeys,key])
+}
 
 const answers = computed({
   get: () => props.modelValue,
@@ -157,6 +164,9 @@ defineExpose({ buildAnswerList })
 </script>
 
 <style scoped>
+.question-picker { display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;flex-shrink:0;border:2px solid #b8cbd7;border-radius:50%;background:white;cursor:pointer;color:white;transition:background .15s,border-color .15s; }
+.question-picker.checked { background:#35b5dc;border-color:#35b5dc; }
+.question-picker:disabled { opacity:.35;cursor:not-allowed; }
 .question-paper {
   display: flex;
   flex-direction: column;

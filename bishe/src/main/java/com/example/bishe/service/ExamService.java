@@ -206,7 +206,13 @@ public class ExamService {
         if (studentId == null) {
             throw new BusinessException("学生ID不能为空");
         }
-        return userExamRecordMapper.findByStudentId(studentId);
+        var records=userExamRecordMapper.findByStudentId(studentId);
+        for(var record:records){
+            record.setSubmitted(examQuestionAnswerMapper.countByExamAndStudent(record.getExamId(),studentId)>0);
+            var exam=examMapper.findById(record.getExamId());
+            if(exam!=null && !canStudentViewResult(exam)){record.setExamScore(null);record.setTeacherScore(null);}
+        }
+        return records;
     }
 
     /** 学生查看自己某次考试的作答复盘(提交后可反复查看) */
@@ -376,7 +382,7 @@ public class ExamService {
                 answer.setScore(eq.getScore());
             } else {
                 answer.setScore(BigDecimal.ZERO);
-                addToErrorBook(request.getStudentId(), eq.getQuestionId(), eq.getQuestionType());
+                if (canStudentViewResult(exam)) addToErrorBook(request.getStudentId(), eq.getQuestionId(), eq.getQuestionType());
             }
 
             examQuestionAnswerMapper.insert(answer);
@@ -466,7 +472,7 @@ public class ExamService {
         answer.setAnnotation(resolveGradedAnnotation(request.getAnnotation()));
         examQuestionAnswerMapper.updateScore(answer);
 
-        if (request.getScore().compareTo(eq.getScore()) < 0) {
+        if (request.getScore().compareTo(eq.getScore()) < 0 && canStudentViewResult(exam)) {
             addToErrorBook(request.getStudentId(), request.getQuestionId(), request.getQuestionType());
         }
 

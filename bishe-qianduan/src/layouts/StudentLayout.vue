@@ -23,6 +23,7 @@
           :key="item.path"
           :to="item.path"
           class="nav-item"
+          :class="{ 'is-active': item.path.endsWith('/courses') && route.path.startsWith(item.path + '/') }"
           active-class="is-active"
         >
           <i aria-hidden="true" :class="item.icon" />
@@ -35,6 +36,7 @@
           :key="item.path"
           :to="item.path"
           class="nav-item"
+          :class="{ 'is-active': item.path === '/student/tasks' && (route.path.startsWith('/student/assessment/') || route.path.startsWith('/student/quiz/')) }"
           active-class="is-active"
         >
           <i aria-hidden="true" :class="item.icon" />
@@ -47,6 +49,7 @@
           :key="item.path"
           :to="item.path"
           class="nav-item"
+          :class="{ 'is-active': item.path.endsWith('/courses') && route.path.startsWith(item.path + '/') }"
           active-class="is-active"
         >
           <i aria-hidden="true" :class="item.icon" />

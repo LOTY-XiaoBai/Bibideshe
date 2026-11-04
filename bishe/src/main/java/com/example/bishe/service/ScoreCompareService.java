@@ -129,6 +129,7 @@ public class ScoreCompareService {
             throw new BusinessException("课程不存在");
         }
         CoursePersonnel self = coursePersonnelMapper.find(courseId, studentId);
+        if (Boolean.FALSE.equals(course.getShowStudentRanking())) throw new BusinessException(403,"教师尚未开放课程成绩排名");
         if (self == null) {
             throw new BusinessException("您未选修该课程");
         }

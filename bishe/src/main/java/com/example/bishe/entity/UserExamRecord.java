@@ -25,4 +25,5 @@ public class UserExamRecord {
 
     /** 开始考试时间(用于 time_limit 校验) */
     private LocalDateTime startTime;
+    private Boolean submitted;
 }

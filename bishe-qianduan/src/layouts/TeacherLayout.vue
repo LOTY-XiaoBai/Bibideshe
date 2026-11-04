@@ -22,6 +22,7 @@
           :key="item.path"
           :to="item.path"
           class="nav-item"
+          :class="{ 'is-active': item.path.endsWith('/courses') && route.path.startsWith(item.path + '/') }"
           active-class="is-active"
         >
           <i aria-hidden="true" :class="item.icon" />
@@ -34,6 +35,7 @@
           :key="item.path"
           :to="item.path"
           class="nav-item"
+          :class="{ 'is-active': item.path.endsWith('/courses') && route.path.startsWith(item.path + '/') }"
           active-class="is-active"
         >
           <i aria-hidden="true" :class="item.icon" />
@@ -46,6 +48,7 @@
           :key="item.path"
           :to="item.path"
           class="nav-item"
+          :class="{ 'is-active': item.path.endsWith('/courses') && route.path.startsWith(item.path + '/') }"
           active-class="is-active"
         >
           <i aria-hidden="true" :class="item.icon" />
@@ -77,14 +80,15 @@ useClassroomNotifications()
 import CountBadge from '@/components/CountBadge.vue'
 import { useUnread } from '@/stores/unread'
 const unread = useUnread()
-function menuCount(path){return path.endsWith('/activity')?unread.activityCount:path.endsWith('/chat')?(path.startsWith('/admin')?unread.data.violations:unread.chatCount):path.endsWith('/audit')?unread.data.questions:0}
+function menuCount(path){if(path.endsWith('/courses'))return unread.data.courseApplications||0;return path.endsWith('/activity')?unread.activityCount:path.endsWith('/chat')?(path.startsWith('/admin')?unread.data.violations:unread.chatCount):path.endsWith('/audit')?unread.data.questions:0}
 
 import { computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { startSessionGuard } from '@/utils/sessionGuard'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const workMenus = [

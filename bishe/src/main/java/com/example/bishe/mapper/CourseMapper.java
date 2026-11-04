@@ -14,6 +14,7 @@ public interface CourseMapper {
 
     /** 新增课程, 自增主键回填到实体 courseId */
     int insert(Course course);
+    int updateSettings(Course course);
 
     /** 按课程ID查询课程 */
     Course findById(Long courseId);

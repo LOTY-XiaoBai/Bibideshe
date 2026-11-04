@@ -111,7 +111,7 @@ public class TeacherService {
         vo.setDisplayName(teacher.getName());
         vo.setSignature(teacher.getSignature());
         vo.setAvatar(teacher.getAvatar());
-        vo.setCourseCount(teacher.getCourseCount());
+        vo.setCourseCount(teacherMapper.countActiveCourses(teacherId));
         if (ratingCount <= 0) {
             vo.setComprehensiveScore(null);
             vo.setHasRating(false);

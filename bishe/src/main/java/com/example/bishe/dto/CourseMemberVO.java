@@ -18,4 +18,6 @@ public class CourseMemberVO {
     private String avatar;
 
     private BigDecimal studentScore;
+    private java.time.LocalDateTime joinedAt;
+    private Integer rank;
 }

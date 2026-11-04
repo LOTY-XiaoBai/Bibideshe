@@ -6,9 +6,8 @@
       <div v-if="!canEdit" class="score-summary"><span>我的得分</span><strong>{{ quiz.student?.score == null ? '待公布' : quiz.student.score }}</strong><span v-if="quiz.answersVisible && !Number(quiz.student?.graded)">含待教师批阅的解答题</span><span v-if="quiz.student?.status === 'ABSENT'">未提交</span></div>
       <el-tabs v-model="tab"><el-tab-pane :label="canEdit ? '小测作答' : '题目与复盘'" name="paper" /><el-tab-pane v-if="rankingAvailable" label="小测排名" name="ranking" /></el-tabs>
       <template v-if="tab === 'paper'">
-        <QuestionPaper :questions="quiz.questions || []" v-model="answers" :readonly="!canEdit" :review-items="!canEdit && quiz.answersVisible ? quiz.answers || [] : []" />
+        <StudyQuestionPaper :questions="quiz.questions || []" v-model="answers" :readonly="!canEdit" source="QUIZ" :source-id="quizId" :answers-visible="!!quiz.answersVisible" :review-items="!canEdit && quiz.answersVisible ? quiz.answers || [] : []" />
         <div v-if="canEdit" class="submit-row"><span :class="{ warning: saveState === '保存失败，将重试' }">{{ saveState }}</span><el-button type="primary" :loading="submitting" @click="submit">提交小测</el-button></div>
-        <section v-if="mistakes.length" class="mistake-section"><h4>本次错题</h4><p>可自行选择加入错题本，解答题需批阅后操作。</p><article v-for="a in mistakes" :key="`${a.questionType}-${a.questionId}`"><span>{{ a.question.content }}</span><el-button size="small" :disabled="added.has(`${a.questionType}-${a.questionId}`)" @click="addMistake(a)">{{ added.has(`${a.questionType}-${a.questionId}`) ? '已加入' : '加入错题本' }}</el-button></article></section>
       </template>
       <el-table v-else :data="ranking" empty-text="暂无已完成批阅的成绩"><el-table-column prop="rank" label="排名" width="80" /><el-table-column prop="nickname" label="学生" /><el-table-column prop="score" label="得分" width="110" /></el-table>
     </template>
@@ -16,18 +15,17 @@
   </section>
 </template>
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { fetchQuiz, saveQuizDraft, submitQuiz, fetchQuizScores, addQuizMistake } from '@/api/quiz'
+import { fetchQuiz, saveQuizDraft, submitQuiz, fetchQuizScores } from '@/api/quiz'
 import { onChatEvent } from '@/utils/websocket'
-import QuestionPaper from './QuestionPaper.vue'
+import StudyQuestionPaper from './StudyQuestionPaper.vue'
 const props = defineProps({ quizId: { type: [Number,String], required:true } })
 const emit = defineEmits(['submitted'])
-const quiz=ref(null), loading=ref(false), answers=ref({}), submitting=ref(false), tab=ref('paper'), ranking=ref([]), saveState=ref('作答后自动保存'), now=ref(Date.now()), added=reactive(new Set())
+const quiz=ref(null), loading=ref(false), answers=ref({}), submitting=ref(false), tab=ref('paper'), ranking=ref([]), saveState=ref('作答后自动保存'), now=ref(Date.now())
 const canEdit=computed(()=>!!quiz.value && !quiz.value.endedAt && ['PENDING','DRAFT'].includes(quiz.value.student?.status))
 const rankingAvailable=computed(()=>quiz.value && Number(quiz.value.showRanking) && quiz.value.answersVisible && !canEdit.value)
 const remainingLabel=computed(()=>{const seconds=Math.max(0,Math.ceil((new Date(quiz.value?.deadline).getTime()-now.value)/1000));return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`})
-const mistakes=computed(()=>quiz.value?.answersVisible ? (quiz.value.answers||[]).filter(a=>a.score!==null && Number(a.score)<Number(a.fullScore)) : [])
 let saveTimer, refreshTimer, clockTimer, disposed=false, hydrating=false, sequence=0, saving=Promise.resolve(), loadingRefresh=false
 const answerList=()=> (quiz.value?.questions||[]).map(item=>({ questionId:item.question.questionId,questionType:item.question.questionType,studentAnswer:answers.value[`${item.question.questionType}-${item.question.questionId}`]||'' }))
 function hydrate(rows){hydrating=true;answers.value=Object.fromEntries((rows||[]).map(a=>[`${a.questionType}-${a.questionId}`,a.studentAnswer]));hydrating=false}
@@ -60,9 +58,8 @@ async function submit(){
 }
 async function loadRanking(){if(!rankingAvailable.value)return;try{ranking.value=(await fetchQuizScores(props.quizId)).data||[]}catch{}}
 watch(tab,value=>{if(value==='ranking')loadRanking()})
-async function addMistake(a){try{await addQuizMistake(props.quizId,a.questionId,a.questionType);added.add(`${a.questionType}-${a.questionId}`);ElMessage.success('已加入错题本')}catch{}}
 const off=onChatEvent(event=>{if(event.type==='QUIZ_ENDED'&&String(event.data?.id)===String(props.quizId)){load();loadRanking()}})
-watch(()=>props.quizId,()=>{sequence++;quiz.value=null;hydrate([]);added.clear();tab.value='paper';load(true)},{immediate:true})
+watch(()=>props.quizId,()=>{sequence++;quiz.value=null;hydrate([]);tab.value='paper';load(true)},{immediate:true})
 refreshTimer=setInterval(()=>{if(saveState.value==='保存失败，将重试'&&canEdit.value)persist().catch(()=>{});load();if(tab.value==='ranking')loadRanking()},5000)
 clockTimer=setInterval(()=>{now.value=Date.now();if(canEdit.value&&quiz.value.deadline&&new Date(quiz.value.deadline).getTime()<=now.value)load()},1000)
 onBeforeUnmount(()=>{clearTimeout(saveTimer);if(canEdit.value)persist().catch(()=>{});disposed=true;sequence++;clearInterval(refreshTimer);clearInterval(clockTimer);off()})
