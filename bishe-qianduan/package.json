@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node ../scripts/dev-tools.mjs redis",
     "dev": "vite",
+    "ports": "node ../scripts/dev-tools.mjs status",
+    "stop": "node ../scripts/dev-tools.mjs stop",
     "build": "vite build",
     "preview": "vite preview"
   },

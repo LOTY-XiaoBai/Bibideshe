@@ -16,7 +16,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 sh scripts/start-demo.sh
 ```
 
-首次构建需要下载镜像和依赖。启动后访问 `http://localhost:8088`，注册自己的账号；管理员通过登录页的首次初始化入口创建。
+首次构建需要下载镜像和依赖。启动后访问 `http://localhost:8088`，注册自己的账号。首次创建管理员时，在登录页的初始化入口输入本地 `.env.demo` 中的 `ADMIN_BOOTSTRAP_SECRET` 和自选密码。旧版已经生成的 `.env.demo` 会保留，若为空库且缺少这一项，需要自行添加至少 32 位的随机密钥后重新启动。
 
 启动脚本自动生成被 Git 忽略的 `.env.demo`，其中数据库密码、Redis 密码和 Token 密钥均为随机值；已有配置会保留。使用独立的 `bishe-demo` Docker 项目和数据卷，不连接原作者本机 MySQL，不附带真实用户、聊天、帖子、订单，也没有公用默认账号密码。
 
@@ -28,7 +28,7 @@ docker compose --env-file .env.demo --project-name bishe-demo down
 
 不要额外加 `-v`，该参数会删除演示数据库等数据卷。
 
-## 项目里保留的 16 个 SQL 都参与自动启动
+## 项目里保留的 19 个 SQL 都参与自动启动
 
 它们是程序运行所需的建表/迁移代码，**不是数据库数据备份，需要提交到 Git**。
 
@@ -50,10 +50,13 @@ docker compose --env-file .env.demo --project-name bishe-demo down
 | `bishe/sql/20_merchant_storefront.sql` | 商家主页背景、商品/商家主页两种广告关联方式 |
 | `bishe/sql/21_merchant_ban_duration.sql` | 限时与永久封禁、到期解禁索引、既有封禁商家的商品和广告撤回 |
 | `bishe/sql/22_home_carousel.sql` | 首页轮播开关、播放间隔及商家广告展示选择 |
+| `bishe/sql/23_error_book_redo.sql` | 错题重做、历史记录与已删除题目的复习快照 |
+| `bishe/sql/24_initial_admin.sql` | 初代管理员归属和地图配置 |
+| `bishe/sql/25_shop_catalog_filters.sql` | 可选商品标签 |
 
 `07` 文件名里的 `manual` 是历史命名，现在也由程序自动执行；保留原文件名是为了兼容已经记录的迁移版本。编号有间隔正常，已经合并或被替代的旧脚本已清理，不需要补回。
 
-后端的 `DatabaseInitializer` 按顺序执行这些文件，并通过 `app_schema_migration` 记录已完成版本，后续启动不重复执行。Maven 将 SQL 打包进后端，Docker 构建也会带上它们。不能把这 16 个文件当成无用备份删除，否则首次部署或数据库升级会失败。
+后端的 `DatabaseInitializer` 按顺序执行这些文件，并通过 `app_schema_migration` 记录已完成版本，后续启动不重复执行。Maven 将 SQL 打包进后端，Docker 构建也会带上它们。不能把这些文件当成无用备份删除，否则首次部署或数据库升级会失败。
 
 Navicat 只是连接 MySQL 的客户端，界面里看到的是 MySQL 中实际保存的表和数据。项目 SQL 是创建或升级这些表的指令，与 Navicat 不自动同步。当前受控 SQL 只含表结构、通用预置词和迁移逻辑，不含原作者的业务数据。
 
@@ -65,7 +68,7 @@ Navicat 只是连接 MySQL 的客户端，界面里看到的是 MySQL 中实际�
 
 1. 在项目根目录将 `.env.example` 复制为 `.env`，填写自己的数据库、Redis 和密钥配置。已有 `.env` 不要覆盖。
 2. 在 MySQL 中创建配置所指向的空数据库，授予应用账号建表和结构升级权限。后端会自动初始化；已有数据库保留数据并按版本升级。
-3. Windows 本机 Redis 可双击“启动Redis.cmd”。默认安装位置由 `scripts/start-redis.ps1` 的 `RedisDirectory` 参数指定，连接配置读取 `.env`。
+3. Windows 下运行 `npm run dev` 会先检查 Redis，未启动时自动在后台启动，收到 `PONG` 后再启动前端，无需另点 Redis。安装目录依次读取 `REDIS_DIRECTORY`、PATH、`D:\Redis-123\Redis`，目录内需有 `redis-server.exe` 和 `redis.conf`，其中端口、密码须与根目录 `.env` 一致。已启动的 Redis 直接复用；密码不一致会中止启动并给出提示。也保留“启动Redis.cmd”。Linux/macOS 下先启动本机或远程 Redis，开发命令会验证连接。
 4. 使用 Java 17+ 启动后端：
 
    ```powershell
@@ -82,6 +85,21 @@ Navicat 只是连接 MySQL 的客户端，界面里看到的是 MySQL 中实际�
    ```
 
 本机开发默认前端 `http://localhost:5173`，后端 `http://localhost:8080`。
+
+也可直接在项目根目录运行 `npm run dev`，仍是启动 Redis 检查与前端；后端继续通过 IDEA 或 Maven 启动。前端端口占用时直接报错，不再自动换成 5174 等端口。
+
+### 查看和关闭开发端口（Windows）
+
+在根目录或前端目录均可执行：
+
+```powershell
+npm run ports  # 显示本项目监听端口与 PID
+npm stop       # 关闭本项目前端、后端，保留 Redis 和 MySQL
+```
+
+也可双击根目录的“查看项目端口.cmd”或“关闭项目前后端.cmd”。工具根据进程命令行和 Java 参数文件核实当前仓库路径，支持 IDEA、Maven、Vite 及遗留在其他端口的本项目进程；不依赖 IDEA 是否显示它们。无法确认归属的进程标为 `SKIP`，不会直接按端口号强制清理其他项目。关闭操作会结束进行中的开发请求，完成后可重新启动。
+
+`.run/` 提供共享 IDEA npm 运行配置：`Bishe - Show project ports`、`Bishe - Stop frontend and backend`。IDEA 需支持 npm 运行配置并设置 Node.js；若当前版本未识别，直接用上述命令或双击入口。这是项目自带工具，不需要安装第三方端口插件，也不处理 Docker 演示容器；演示环境使用前述 Compose 停止命令。
 
 ## 网络授课运行条件
 
@@ -115,7 +133,11 @@ Navicat 只是连接 MySQL 的客户端，界面里看到的是 MySQL 中实际�
 
 商家工作台仅含自己的商品、广告、订单物流、评价和店铺设置。商家可在店铺设置上传头像和主页背景，商品详情与广告可进入商家主页，主页展示综合评分、评价数、发货城市与全部在售商品。周边商城支持按商品、商家和发货城市搜索。管理员可选择1天、3天、2周、1个月、3个月、10年或永久封禁合作方，必须填写原因，也可手动解禁；限时封禁到期自动解除。封禁后禁止登录，登录页弹窗显示原因及期限，商家主页展示封禁说明；所有商品下架、广告撤销，订单保留。到期或手动解禁后需重新登录，商品和广告必须重新提交审核。审核页“全部记录”位于首项且默认选中。管理员商家页面使用管理员主题。订单记录下单时的商家、商品名称、价格、收货地址与发货城市；商品下架后仍可发货、收货、评价和处理售后。买家与商家均可从各自列表删除已收货且没有进行中售后的历史订单，互不影响另一方记录与已有评价。旧版管理员直接发布的数据保留用于历史订单，不自动作为新审核商品或首页广告公开。
 
-发货城市可直接手填。自动定位识别需在 `.env` 设置 `AMAP_WEB_KEY`（高德 Web 服务 API Key，Docker 已透传），并使用允许定位的 HTTPS 或 localhost 环境；未配置或定位失败时手填即可完成入驻。只持久化城市名称，地图密钥仅在后端使用。[高德逆地理编码说明](https://lbs.amap.com/api/webservice/guide/api/georegeo)。
+师生商城支持组合使用关键词、价格区间、标签和发货城市。点击标签立即刷新结果。商品标签可留空，「其他」筛出无标签商品。买家可手选发货城市，或主动使用定位选同城，页面按城市筛选。定位需要允许定位的 HTTPS 或 localhost 环境。
+
+初代管理员可在「账号管理 → 高德地图配置」保存高德 Web 服务 Key。保存值加密存储，部署配置中的 `AMAP_WEB_KEY` 用作回退。已有库若没有登记初代管理员，由部署方在 `.env` 中填写核实过的 `INITIAL_ADMIN_ID`，该账号首次保存地图配置时登记归属。未设置 `ADMIN_BOOTSTRAP_SECRET` 时关闭空库初始化。轮换令牌密钥前，如地图配置沿用了原令牌密钥加密，须把原值保留在部署环境的 `ADMIN_SETTINGS_SECRET` 中。未配置高德或定位失败时，商家仍可手填发货城市，买家仍可手选。[高德逆地理编码说明](https://lbs.amap.com/api/webservice/guide/api/georegeo)
+
+已有管理员的旧库可直接指定一个受信任的现有账号作为初代。若希望使用单独的账号，先由现有管理员在「账号管理 → 创建新管理员」创建并记录页面显示的登录 ID，再将该 ID 填入本地 `.env` 的 `INITIAL_ADMIN_ID`。重启后端后，用指定账号登录并保存地图配置即可登记归属。
 
 ## 检查命令
 

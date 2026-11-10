@@ -1,6 +1,7 @@
 package com.example.bishe.controller;
 
 import com.example.bishe.common.AuthContext;
+import com.example.bishe.common.BusinessException;
 import com.example.bishe.common.Result;
 import com.example.bishe.dto.AdPublishRequest;
 import com.example.bishe.dto.AfterSaleReplyRequest;
@@ -11,6 +12,7 @@ import com.example.bishe.dto.OrderFeedbackRequest;
 import com.example.bishe.dto.OrderVO;
 import com.example.bishe.entity.Advertisement;
 import com.example.bishe.entity.OrderEvaluation;
+import com.example.bishe.service.MerchantLocationService;
 import com.example.bishe.service.ShopService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,9 +36,11 @@ import java.util.Map;
 public class ShopController {
 
     private final ShopService shopService;
+    private final MerchantLocationService location;
 
-    public ShopController(ShopService shopService) {
+    public ShopController(ShopService shopService, MerchantLocationService location) {
         this.shopService = shopService;
+        this.location = location;
     }
 
     // ==================== 管理员 ====================
@@ -123,9 +127,35 @@ public class ShopController {
 
     @Operation(summary = "浏览在售广告商品")
     @GetMapping("/ad/list")
-    public Result<List<Advertisement>> listAds(@RequestParam(defaultValue="") String keyword) {
+    public Result<List<Advertisement>> listAds(@RequestParam(defaultValue="") String keyword,
+                                               @RequestParam(defaultValue="") String minPrice,
+                                               @RequestParam(defaultValue="") String maxPrice,
+                                               @RequestParam(defaultValue="") String tags,
+                                               @RequestParam(defaultValue="") String city) {
         AuthContext.requireUserId();
-        return Result.success(shopService.listActiveAds(keyword));
+        return Result.success(shopService.listActiveAds(keyword, minPrice, maxPrice, tags, city));
+    }
+
+    @GetMapping("/catalog-options")
+    public Result<Map<String, Object>> catalogOptions() {
+        AuthContext.requireUserId();
+        return Result.success(shopService.catalogOptions());
+    }
+
+    @GetMapping("/location/available")
+    public Result<Map<String, Boolean>> locationAvailable() {
+        AuthContext.requireUserId();
+        return Result.success(Map.of("available", location.available()));
+    }
+
+    @GetMapping("/location/city")
+    public Result<Map<String, String>> locateCity(@RequestParam(required=false) Double lat,
+                                                  @RequestParam(required=false) Double lon) {
+        AuthContext.requireUserId();
+        if (lat == null || lon == null) {
+            throw new BusinessException("缺少定位坐标，请手动选择发货城市");
+        }
+        return Result.success(Map.of("city", shopService.catalogCity(location.city(lat, lon).get("city"))));
     }
 
     @Operation(summary = "广告/商品详情")

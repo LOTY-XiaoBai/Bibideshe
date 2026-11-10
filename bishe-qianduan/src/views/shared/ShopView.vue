@@ -25,7 +25,51 @@
       </div>
     </header>
 
-    <el-form v-if="mainTab==='goods'" class="shop-search" @submit.prevent="loadAds"><el-input v-model="keyword" size="large" clearable maxlength="100" placeholder="搜索商品、商家或发货城市" aria-label="搜索商品、商家或发货城市" @clear="loadAds"><template #prefix><i class="ph ph-magnifying-glass" /></template></el-input><el-button native-type="submit" type="primary" size="large" :loading="adsLoading">搜索</el-button></el-form>
+    <el-form v-if="mainTab === 'goods'" class="shop-search" @submit.prevent="loadAds">
+      <div class="shop-search-head">
+        <h3>筛选商品</h3>
+        <el-button text @click="clearFilters">清空条件</el-button>
+      </div>
+      <div class="shop-keyword">
+        <el-input v-model="keyword" size="large" clearable maxlength="100" placeholder="搜索商品、商家或发货城市"
+          aria-label="搜索商品、商家或发货城市" @clear="loadAds">
+          <template #prefix><i class="ph ph-magnifying-glass" /></template>
+        </el-input>
+        <el-button native-type="submit" size="large" type="primary" :loading="adsLoading">搜索</el-button>
+      </div>
+      <div class="shop-filter-fields">
+        <fieldset class="shop-filter-field">
+          <legend>价格区间（元）</legend>
+          <div class="shop-price-range">
+            <input v-model.trim="filters.minPrice" aria-label="最低价" inputmode="decimal" maxlength="11" placeholder="最低价" />
+            <span aria-hidden="true">–</span>
+            <input v-model.trim="filters.maxPrice" aria-label="最高价" inputmode="decimal" maxlength="11" placeholder="最高价" />
+          </div>
+        </fieldset>
+        <fieldset class="shop-filter-field">
+          <legend>发货城市</legend>
+          <div class="shop-city-picker">
+            <select v-model="filters.city" aria-label="发货城市">
+              <option value="">不限城市</option>
+              <option v-for="city in cityOptions" :key="city" :value="city">{{ city }}</option>
+            </select>
+            <el-button :loading="locating" @click="useLocation">
+              <i class="ph ph-map-pin" aria-hidden="true" />定位我的城市
+            </el-button>
+          </div>
+        </fieldset>
+      </div>
+      <fieldset class="shop-tag-filters">
+        <legend>商品标签</legend>
+        <div class="shop-tag-options">
+          <label v-for="tag in filterTags" :key="tag.code">
+            <input v-model="filters.tags" type="checkbox" :value="tag.code" @change="loadAds" />
+            <span>{{ tag.label }}</span>
+          </label>
+        </div>
+      </fieldset>
+      <p v-if="locationNotice" class="shop-location-notice" role="status">{{ locationNotice }}</p>
+    </el-form>
     <!-- 商品列表 -->
     <section v-show="mainTab === 'goods'" v-loading="adsLoading" class="goods-grid">
       <article
@@ -47,6 +91,10 @@
         </div>
         <div class="goods-body">
           <h3>{{ ad.title || `商品 #${ad.adId}` }}</h3><RouterLink v-if="ad.merchantId" class="goods-merchant" :to="`/${getRole().toLowerCase()}/shop/merchant/${ad.merchantId}`" @click.stop><i class="ph ph-storefront" /> {{ ad.merchantName||'进入店铺' }} <i class="ph ph-caret-right" /></RouterLink>
+          <div v-if="ad.shipCity || ad.tags?.length" class="goods-labels">
+            <span v-if="ad.shipCity">{{ ad.shipCity }}发货</span>
+            <el-tag v-for="tag in ad.tags" :key="tag" size="small" effect="plain">{{ tagLabels[tag] || tag }}</el-tag>
+          </div>
           <p>{{ ad.content || '暂无描述' }}</p>
           <div class="goods-foot">
             <span class="price">¥ {{ formatPrice(ad.price) }}</span>
@@ -57,7 +105,7 @@
           </el-button>
         </div>
       </article>
-      <p v-if="!adsLoading && !ads.length" class="empty-tip">{{ keyword ? '没有找到匹配的商品，换个关键词试试' : '暂无在售商品' }}</p>
+      <p v-if="!adsLoading && !ads.length" class="empty-tip">{{ appliedFilters ? '没有找到匹配的商品，可调整或清空条件' : '暂无在售商品' }}</p>
     </section>
 
     <!-- 订单中心 -->
@@ -226,11 +274,14 @@
 import { useRouter } from 'vue-router'
 import { getRole } from '@/utils/auth'
 const router = useRouter()
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { resolveMediaUrl } from '@/utils/media'
 import {
   fetchAdList,
+  fetchCatalogOptions,
+  shopLocationAvailable,
+  locateShopCity,
   deleteMyOrder,
   fetchAdDetail,
   createOrder,
@@ -243,6 +294,15 @@ import {
 
 const mainTab = ref('goods')
 const keyword = ref('')
+const filters = reactive({ minPrice: '', maxPrice: '', city: '', tags: [] })
+const options = ref({ cities: [], tags: [] })
+const cityOptions = computed(() => [...new Set([...options.value.cities, filters.city].filter(Boolean))])
+const filterTags = computed(() => [...options.value.tags, { code: 'other', label: '其他' }])
+const tagLabels = computed(() => Object.fromEntries(filterTags.value.map(tag => [tag.code, tag.label])))
+const locating = ref(false)
+const locationNotice = ref('')
+const appliedFilters = ref(false)
+let locationVersion = 0
 let searchVersion=0
 const ads = ref([])
 const adsLoading = ref(false)
@@ -299,16 +359,82 @@ function statusTag(s) {
 }
 
 async function loadAds() {
+  const { minPrice, maxPrice, city, tags } = filters
+  const validPrice = value => !value || /^\d{1,8}(\.\d{1,2})?$/.test(value)
+  if (!validPrice(minPrice) || !validPrice(maxPrice)) {
+    return ElMessage.warning('筛选价格须为非负金额，最多两位小数')
+  }
+  if (minPrice && maxPrice && Number(minPrice) > Number(maxPrice)) {
+    return ElMessage.warning('最低价不能高于最高价')
+  }
   const stamp=++searchVersion
   adsLoading.value = true
   try {
-    const res = await fetchAdList(keyword.value)
+    const search = keyword.value.trim()
+    const res = await fetchAdList(search, { minPrice, maxPrice, city, tags: tags.join(',') })
     if(stamp!==searchVersion)return
+    appliedFilters.value = Boolean(search || minPrice || maxPrice || city || tags.length)
     ads.value = res.data || []
   } catch {
     if(stamp===searchVersion)ads.value = []
   } finally {
     if(stamp===searchVersion)adsLoading.value = false
+  }
+}
+
+function clearFilters() {
+  ++locationVersion
+  locating.value = false
+  keyword.value = ''
+  Object.assign(filters, { minPrice: '', maxPrice: '', city: '', tags: [] })
+  locationNotice.value = ''
+  loadAds()
+}
+
+async function loadCatalogOptions() {
+  try {
+    options.value = (await fetchCatalogOptions()).data
+  } catch {}
+}
+
+async function useLocation() {
+  const stamp = ++locationVersion
+  const originalCity = filters.city
+  const manual = '请手动选择发货城市'
+  locationNotice.value = ''
+  if (!window.isSecureContext || !navigator.geolocation) {
+    locationNotice.value = `当前页面无法定位，${manual}。`
+    return
+  }
+  locating.value = true
+  try {
+    const { data } = await shopLocationAvailable()
+    if (stamp !== locationVersion) return
+    if (!data.available) {
+      locationNotice.value = `城市识别尚未配置，${manual}。`
+      return
+    }
+    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
+      timeout: 10000,
+      maximumAge: 300000,
+    }))
+    if (stamp !== locationVersion) return
+    const { latitude, longitude } = position?.coords || {}
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      locationNotice.value = `没有获得有效定位坐标，${manual}。`
+      return
+    }
+    const result = await locateShopCity(latitude, longitude)
+    if (stamp !== locationVersion || filters.city !== originalCity) return
+    filters.city = result.data.city
+    locationNotice.value = `已选择同城发货 · ${filters.city}`
+    await loadAds()
+  } catch (error) {
+    if (stamp === locationVersion) {
+      locationNotice.value = error.code === 1 ? `定位权限被拒绝，${manual}。` : `未能识别城市，${manual}。`
+    }
+  } finally {
+    if (stamp === locationVersion) locating.value = false
   }
 }
 
@@ -431,12 +557,74 @@ async function doAfterSale() {
 }
 
 onMounted(() => {
+  loadCatalogOptions()
   loadAds()
 })
 </script>
 
 <style scoped>
-.shop-search{display:flex;gap:12px;max-width:720px;margin-bottom:24px}.shop-search .el-input{flex:1}.goods-merchant{display:inline-flex;gap:6px;align-items:center;font-size:11px;color:#8e9eaf;margin:3px 0 10px}.goods-merchant:hover{color:var(--theme-primary)}
+.shop-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 15px;
+  max-width: 980px;
+  margin-bottom: 24px;
+  padding: clamp(14px, 2vw, 22px);
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 16px;
+}
+.shop-search-head, .shop-keyword, .shop-city-picker, .shop-price-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shop-search-head { justify-content: space-between; }
+.shop-search-head h3 { margin: 0; font-size: 16px; }
+.shop-keyword .el-input { min-width: 0; flex: 1; }
+.shop-filter-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; }
+.shop-filter-field, .shop-tag-filters { margin: 0; padding: 0; border: 0; min-width: 0; }
+.shop-filter-field legend, .shop-tag-filters legend { margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.shop-price-range input, .shop-city-picker select {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  height: 36px;
+  padding: 0 9px;
+  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-blank);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+}
+.shop-city-picker .el-button { flex-shrink: 0; height: 36px; }
+.shop-city-picker i { margin-right: 4px; }
+.shop-tag-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.shop-tag-options label { position: relative; cursor: pointer; }
+.shop-tag-options input { position: absolute; opacity: 0; }
+.shop-tag-options span {
+  display: block;
+  padding: 6px 13px;
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-light);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.shop-tag-options label:hover span { border-color: var(--theme-primary); }
+.shop-tag-options input:checked + span {
+  color: var(--el-color-primary-dark-2);
+  background: var(--el-color-primary-light-9);
+  border-color: var(--theme-primary);
+  font-weight: 600;
+}
+.shop-tag-options input:focus-visible + span { outline: 2px solid var(--theme-primary); outline-offset: 2px; }
+@media (max-width: 820px) {
+  .shop-filter-fields { grid-template-columns: 1fr; gap: 12px; }
+}
+.shop-location-notice { font-size: 13px; }
+.shop-location-notice { margin: 0; color: #475569; }
+.goods-labels { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 12px; color: #475569; }
+.goods-merchant{display:inline-flex;gap:6px;align-items:center;font-size:11px;color:#8e9eaf;margin:3px 0 10px}.goods-merchant:hover{color:var(--theme-primary)}
 .page-header {
   display: flex;
   align-items: flex-end;

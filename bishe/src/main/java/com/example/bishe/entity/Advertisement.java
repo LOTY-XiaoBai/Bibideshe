@@ -1,9 +1,11 @@
 package com.example.bishe.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 商品实体，沿用 advertisement 表及 adId 以兼容历史订单。
@@ -39,4 +41,11 @@ public class Advertisement {
     private Long merchantId;
     private String merchantName;
     private String reviewStatus;
+    private String shipCity;
+    @JsonIgnore
+    private String tagCodes;
+
+    public List<String> getTags() {
+        return tagCodes == null || tagCodes.isBlank() ? List.of() : List.of(tagCodes.split(","));
+    }
 }

@@ -1,8 +1,20 @@
 import request from './request'
 
 /** 浏览在售广告商品 */
-export function fetchAdList(keyword = '') {
-  return request.get('/api/shop/ad/list', { params: { keyword } })
+export function fetchAdList(keyword = '', filters = {}) {
+  return request.get('/api/shop/ad/list', { params: { keyword, ...filters } })
+}
+
+export function fetchCatalogOptions() {
+  return request.get('/api/shop/catalog-options')
+}
+
+export function shopLocationAvailable() {
+  return request.get('/api/shop/location/available', { silent: true })
+}
+
+export function locateShopCity(lat, lon) {
+  return request.get('/api/shop/location/city', { params: { lat, lon }, silent: true })
 }
 
 /** 广告/商品详情 */

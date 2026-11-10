@@ -15,6 +15,7 @@ export const reviewList = (kind, params) => request.get(`/api/admin/commerce/${k
 export const reviewItem = (kind, id, data) => request.post(`/api/admin/commerce/${kind}/${id}/review`, data)
 export const locationAvailable = () => request.get('/api/merchant/location/available')
 export const locateCity = (lat, lon) => request.get('/api/merchant/location/city', { params: { lat, lon } })
+export const merchantProductTags = () => request.get('/api/merchant/product-tags')
 export const publicCampaigns = () => request.get('/api/shop/campaigns', { silent: true })
 
 export const saveMerchantAvatar = avatar => request.put('/api/merchant/avatar', { avatar })

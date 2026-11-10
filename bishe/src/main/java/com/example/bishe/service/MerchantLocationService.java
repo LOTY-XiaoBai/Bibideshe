@@ -1,7 +1,6 @@
 package com.example.bishe.service;
 
 import com.example.bishe.common.BusinessException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
 import java.net.URI;
@@ -13,15 +12,21 @@ import java.util.*;
 
 @Service
 public class MerchantLocationService {
-    private final String key;
+    private final AdminMapSettingsService settings;
     private final JsonMapper json;
     private final HttpClient client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
     private final Map<String,String> cache=new LinkedHashMap<>();
-    public MerchantLocationService(@Value("${app.merchant.amap-key:}")String key,JsonMapper json){this.key=key;this.json=json;}
-    public boolean available(){return !key.isBlank();}
+    private String cachedKey = "";
+    public MerchantLocationService(AdminMapSettingsService settings,JsonMapper json){this.settings=settings;this.json=json;}
+    public boolean available(){return !settings.effectiveKey().isBlank();}
     public synchronized Map<String,String> city(double lat,double lon){
         if(!Double.isFinite(lat)||!Double.isFinite(lon)||lat< -90||lat>90||lon< -180||lon>180)throw new BusinessException("定位坐标无效");
-        if(!available())throw new BusinessException(503,"当前未启用自动识别城市，请手动填写发货城市");
+        String key = settings.effectiveKey();
+        if(key.isBlank())throw new BusinessException(503,"当前未启用自动识别城市，请手动填写发货城市");
+        if (!key.equals(cachedKey)) {
+            cache.clear();
+            cachedKey = key;
+        }
         // 浏览器返回 WGS84，经坐标转换接口后再查询城市；不持久化精确位置。
         String cell=String.format(Locale.ROOT,"%.2f,%.2f",lon,lat);
         if(cache.containsKey(cell))return Map.of("city",cache.get(cell));

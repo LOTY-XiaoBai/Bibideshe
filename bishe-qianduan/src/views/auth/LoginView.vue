@@ -21,8 +21,12 @@
         @submit.prevent="handleAdminRegister"
       >
         <p class="bootstrap-tip">
-          系统尚未创建管理员账号，请设置首个管理员密码完成初始化。
+          请使用部署密钥和自选密码创建首个管理员。
         </p>
+
+        <el-form-item label="部署密钥" prop="bootstrapSecret">
+          <el-input v-model="registerForm.bootstrapSecret" type="password" autocomplete="off" />
+        </el-form-item>
 
         <el-form-item label="密码" prop="password">
           <el-input
@@ -223,6 +227,7 @@ const form = reactive({
 const captchaImage = ref('')
 
 const registerForm = reactive({
+  bootstrapSecret: '',
   password: '',
   confirmPassword: '',
 })
@@ -236,6 +241,7 @@ const validateConfirm = (_rule, value, callback) => {
 }
 
 const registerRules = {
+  bootstrapSecret: [{ required: true, message: '请输入部署密钥', trigger: 'blur' }],
   password: [
     { required: true, message: '请设置密码', trigger: 'blur' },
     { min: 6, message: '密码至少 6 位', trigger: 'blur' },
@@ -360,6 +366,7 @@ async function enterAdminMode() {
   form.id = ''
   form.password = ''
   registerForm.password = ''
+  registerForm.bootstrapSecret = ''
   registerForm.confirmPassword = ''
   detectedRole.value = ROLES.ADMIN
   formRef.value?.clearValidate()
@@ -385,6 +392,7 @@ function exitAdminMode() {
   form.id = ''
   form.password = ''
   registerForm.password = ''
+  registerForm.bootstrapSecret = ''
   registerForm.confirmPassword = ''
   detectedRole.value = null
   secretBuffer.value = ''
@@ -399,11 +407,15 @@ async function handleAdminRegister() {
 
   registering.value = true
   try {
-    const res = await registerAdmin({ password: registerForm.password })
+    const res = await registerAdmin({
+      password: registerForm.password,
+      bootstrapSecret: registerForm.bootstrapSecret,
+    })
     const adminId = res.data?.adminId ? String(res.data.adminId) : ''
     createdAdminId.value = adminId
     adminBootstrapAvailable.value = false
     registerForm.password = ''
+    registerForm.bootstrapSecret = ''
     registerForm.confirmPassword = ''
     ElMessage.success(res.message || '管理员注册成功')
     if (adminId) {

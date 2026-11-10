@@ -1,0 +1,10 @@
+{
+  "name": "bishe-dev-tools",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix bishe-qianduan run dev --",
+    "ports": "node scripts/dev-tools.mjs status",
+    "stop": "node scripts/dev-tools.mjs stop",
+    "test:dev-tools": "node --test scripts/test-dev-tools.mjs scripts/test-redis-startup.mjs"
+  }
+}

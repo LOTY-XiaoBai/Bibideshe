@@ -16,6 +16,7 @@ public class MerchantController {
     @GetMapping("/api/merchant/location/city") public Result<?> city(@RequestParam double lat,@RequestParam double lon){merchants.requireMerchant();return Result.success(location.city(lat,lon));}
     @GetMapping("/api/merchant/location/available") public Result<?> locationAvailable(){merchants.requireMerchant();return Result.success(Map.of("available",location.available()));}
     @GetMapping("/api/merchant/product-options") public Result<?> options(@RequestParam(defaultValue="")String keyword){return Result.success(commerce.productOptions(keyword));}
+    @GetMapping("/api/merchant/product-tags") public Result<?> productTags(){return Result.success(commerce.productTags());}
     @PostMapping("/api/merchant/login") public Result<?> login(@RequestBody LoginRequest r){return Result.success(merchants.login(r));}
     @GetMapping("/api/merchant/profile") public Result<?> profile(){return Result.success(merchants.publicProfile(merchants.requireMerchant()));}
     @PutMapping("/api/merchant/profile") public Result<?> saveProfile(@RequestBody Map<String,Object>b){return Result.success(merchants.saveProfile(b));}

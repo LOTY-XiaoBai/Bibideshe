@@ -7,6 +7,8 @@
       </div>
     </header>
 
+    <AdminMapSettings />
+
     <section class="panel">
       <el-tabs v-model="accountType" @tab-change="onTypeChange">
         <el-tab-pane label="学生账号" name="student" />
@@ -100,7 +102,8 @@
         </el-form-item>
       </el-form>
       <el-button type="primary" :loading="creating" @click="handleCreateAdmin">创建管理员</el-button>
-      <p class="tip">管理员 ID 由系统自动生成</p>
+      <p v-if="createdAdminId" class="tip" role="status">新管理员登录 ID <code>{{ createdAdminId }}</code></p>
+      <p v-else class="tip">创建完成后会显示新管理员的登录 ID。</p>
     </section>
   </div>
 </template>
@@ -108,6 +111,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdminMapSettings from '@/components/AdminMapSettings.vue'
 import {
   createAdmin,
   deregisterAccount,
@@ -236,14 +240,18 @@ async function handleDeregister(row) {
   }
 }
 
+const createdAdminId = ref('')
+
 async function handleCreateAdmin() {
+  if (creating.value) return
   if (!adminForm.password) {
     ElMessage.warning('请填写密码')
     return
   }
   creating.value = true
   try {
-    await createAdmin({ password: adminForm.password })
+    const { data } = await createAdmin({ password: adminForm.password })
+    createdAdminId.value = data.adminId
     ElMessage.success('管理员创建成功')
     adminForm.password = ''
   } catch {

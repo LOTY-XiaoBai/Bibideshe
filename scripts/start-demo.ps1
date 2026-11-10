@@ -13,7 +13,7 @@ function New-Secret {
     return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
 }
 if (-not (Test-Path -LiteralPath $demoEnvPath)) {
-    $lines = @('DB_NAME=bishe', 'DB_USERNAME=bishe_app', ('DB_PASSWORD=' + (New-Secret)), ('MYSQL_ROOT_PASSWORD=' + (New-Secret)), ('REDIS_PASSWORD=' + (New-Secret)), ('TOKEN_SECRET=' + (New-Secret)), ('FRONTEND_PORT=' + $Port), ('CORS_ALLOWED_ORIGINS=http://localhost:' + $Port), 'CAPTCHA_EXPOSE_CODE=false', 'SWAGGER_ENABLED=false')
+    $lines = @('DB_NAME=bishe', 'DB_USERNAME=bishe_app', ('DB_PASSWORD=' + (New-Secret)), ('MYSQL_ROOT_PASSWORD=' + (New-Secret)), ('REDIS_PASSWORD=' + (New-Secret)), ('TOKEN_SECRET=' + (New-Secret)), ('ADMIN_BOOTSTRAP_SECRET=' + (New-Secret)), ('FRONTEND_PORT=' + $Port), ('CORS_ALLOWED_ORIGINS=http://localhost:' + $Port), 'CAPTCHA_EXPOSE_CODE=false', 'SWAGGER_ENABLED=false')
     [IO.File]::WriteAllLines($demoEnvPath, $lines, (New-Object Text.UTF8Encoding($false)))
     Write-Host 'Created private .env.demo with fresh random secrets.'
 } else {

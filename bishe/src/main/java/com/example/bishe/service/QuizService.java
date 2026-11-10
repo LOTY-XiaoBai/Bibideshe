@@ -223,15 +223,6 @@ public class QuizService {
         storeAnswers(id,studentId,request);gradeStored(q,studentId);
         return detail(student(studentId),id);
     }
-    private String normalize(String value,int type) {
-        String v=value.trim().replaceAll("\\s+","").toUpperCase(Locale.ROOT).replace('，',',');
-        if(type==2) {
-            if(Set.of("TRUE","1","正确","对","T","YES").contains(v))return "TRUE";
-            if(Set.of("FALSE","0","错误","错","F","NO").contains(v))return "FALSE";
-        }
-        if(type==1) { var chars=new TreeSet<Character>();for(char c:v.toCharArray())if(c!=',')chars.add(c);return chars.toString(); }
-        return v;
-    }
     private void gradeStored(Map<String,Object> q,Long studentId) {
         long id=number(q.get("id"));
         var rows=db.queryForList("SELECT i.*,a.student_answer FROM classroom_quiz_question i JOIN classroom_quiz_answer a ON a.quiz_id=i.quiz_id AND a.question_id=i.question_id AND a.question_type=i.question_type WHERE i.quiz_id=? AND a.student_id=?",id,studentId);
@@ -242,7 +233,7 @@ public class QuizService {
             if(value.isBlank()){score=BigDecimal.ZERO;annotation="未作答";}
             else if(type!=3) {
                 String correct=snapshot(row.get("snapshot_json")).get("answer").toString();
-                score=normalize(correct,type).equals(normalize(value,type))?decimal(row.get("score")):BigDecimal.ZERO;annotation="";
+                score=QuestionService.matchesObjectiveAnswer(correct,value,type)?decimal(row.get("score")):BigDecimal.ZERO;annotation="";
             }
             db.update("UPDATE classroom_quiz_answer SET score=?,annotation=? WHERE quiz_id=? AND student_id=? AND question_id=? AND question_type=?",score,annotation,id,studentId,row.get("question_id"),type);
         }

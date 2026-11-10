@@ -30,4 +30,11 @@ public interface ErrorBookMapper {
 
     /** 按学生删除全部错题(注销账号使用) */
     int deleteByStudentId(Long studentId);
+
+    void archiveDeletedQuestion(@Param("questionId") Long questionId,
+                                @Param("questionType") Integer questionType,
+                                @Param("snapshot") String snapshot);
+
+    String findDeletedQuestion(@Param("questionId") Long questionId,
+                               @Param("questionType") Integer questionType);
 }

@@ -124,6 +124,18 @@ const routes = [
         meta: { title: "我的错题本" },
       },
       {
+        path: "error-book/redo/:id",
+        name: "StudentErrorBookRedo",
+        component: () => import("@/views/student/ErrorBookRedoView.vue"),
+        meta: { title: "重做错题" },
+      },
+      {
+        path: "error-book/history/:id?",
+        name: "StudentErrorBookHistory",
+        component: () => import("@/views/student/ErrorBookHistoryView.vue"),
+        meta: { title: "重做历史" },
+      },
+      {
         path: "shop",
         name: "StudentShop",
         component: () => import("@/views/shared/ShopView.vue"),

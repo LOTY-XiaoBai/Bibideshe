@@ -119,9 +119,31 @@ public class ShopService {
         return listActiveAds("");
     }
     public List<Advertisement> listActiveAds(String keyword) {
+        return listActiveAds(keyword, "", "", "", "");
+    }
+
+    public List<Advertisement> listActiveAds(String keyword, String min, String max, String tags, String city) {
         if(keyword==null)keyword="";
         if(keyword.length()>100)throw new BusinessException("搜索关键词最多100字");
-        return advertisementMapper.searchActive("%"+keyword.trim().replace("!","!!").replace("%","!%").replace("_","!_")+"%");
+        if (city.length() > 80) throw new BusinessException("发货城市最多80字");
+        var minPrice = ShopCatalog.price(min);
+        var maxPrice = ShopCatalog.price(max);
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
+            throw new BusinessException("最低价不能高于最高价");
+        }
+        var selected = ShopCatalog.filterTags(tags);
+        String pattern = "%" + keyword.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        return advertisementMapper.searchActive(pattern, minPrice, maxPrice,
+                city.isBlank() ? List.of() : ShopCatalog.aliases(city),
+                selected.stream().filter(tag -> !"other".equals(tag)).toList(), selected.contains("other"));
+    }
+
+    public Map<String, Object> catalogOptions() {
+        return ShopCatalog.options(advertisementMapper.activeCities());
+    }
+
+    public String catalogCity(String city) {
+        return ShopCatalog.canonicalCity(city);
     }
 
     public Advertisement getAdDetail(Long adId) {

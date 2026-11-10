@@ -184,14 +184,14 @@ $avail = Assert-Api "GET /api/admin/register/available" {
 
 if ($avail -and $avail.data.available -eq $true) {
     $regAdmin = Assert-Api "POST /api/admin/register" {
-        Invoke-Api -Method POST -Path "/api/admin/register" -Body @{ password = $AdminPassword }
+        Invoke-Api -Method POST -Path "/api/admin/register" -Body @{ password = $AdminPassword; bootstrapSecret = $env:ADMIN_BOOTSTRAP_SECRET }
     }
     if ($regAdmin) {
         $adminId = [string]$regAdmin.data.adminId
         Write-Host "  Admin ID = $adminId" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "  Admin already exists; use -BootstrapAdminId <id> (from first bootstrap printout)" -ForegroundColor Yellow
+    Write-Host "  Bootstrap unavailable. Pass an existing admin ID or configure the deployment secret for an empty database." -ForegroundColor Yellow
     if ($BootstrapAdminId) { $adminId = $BootstrapAdminId }
     elseif ($env:ADMIN_ID) { $adminId = $env:ADMIN_ID }
 }

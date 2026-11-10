@@ -9,7 +9,7 @@
         <button v-if="selectionMode" type="button" role="checkbox" class="question-picker" :class="{ checked: selectedKeys.includes(keyOf(item)) }" :aria-checked="selectedKeys.includes(keyOf(item))" :aria-label="`选择第${idx + 1}题`" :disabled="item.question?.lost" @click="toggleSelected(item)"><i v-if="selectedKeys.includes(keyOf(item))" class="ph ph-check" aria-hidden="true" /></button>
         <span class="q-index">{{ idx + 1 }}</span>
         <el-tag size="small">{{ questionTypeLabel(item.question?.questionType) }}</el-tag>
-        <span class="q-score">{{ formatScore(item.score) }} 分</span>
+        <span v-if="!practice" class="q-score">{{ formatScore(item.score) }} 分</span>
       </header>
 
       <p class="q-content">{{ item.question?.content || '题目内容缺失' }}</p>
@@ -34,6 +34,9 @@
           </el-radio>
         </el-radio-group>
         <div v-else class="readonly-answer">
+          <ul v-if="practice" class="review-options">
+            <li v-for="opt in item.question.options" :key="opt.optionCode">{{ opt.optionCode }}. {{ opt.optionContent }}</li>
+          </ul>
           你的答案：{{ answers[keyOf(item)] || '未作答' }}
         </div>
       </template>
@@ -65,13 +68,16 @@
       </template>
 
       <div v-if="showReview && reviewMap[keyOf(item)]" class="review-box">
-        <p>得分：{{ formatScore(reviewMap[keyOf(item)].score) }} / {{ formatScore(item.score) }}</p>
-        <p v-if="reviewStatusText(item, reviewMap[keyOf(item)])">
-          批阅状态：{{ reviewStatusText(item, reviewMap[keyOf(item)]) }}
-        </p>
-        <p v-if="reviewMap[keyOf(item)].annotation && !isPendingAnnotation(reviewMap[keyOf(item)].annotation)">
-          批注：{{ reviewMap[keyOf(item)].annotation }}
-        </p>
+        <p v-if="practice">{{ practiceStatus[reviewMap[keyOf(item)].status] }}</p>
+        <template v-else>
+          <p>得分：{{ formatScore(reviewMap[keyOf(item)].score) }} / {{ formatScore(item.score) }}</p>
+          <p v-if="reviewStatusText(item, reviewMap[keyOf(item)])">
+            批阅状态：{{ reviewStatusText(item, reviewMap[keyOf(item)]) }}
+          </p>
+          <p v-if="reviewMap[keyOf(item)].annotation && !isPendingAnnotation(reviewMap[keyOf(item)].annotation)">
+            批注：{{ reviewMap[keyOf(item)].annotation }}
+          </p>
+        </template>
         <p v-if="reviewMap[keyOf(item)].question?.answer">
           参考答案：{{ reviewMap[keyOf(item)].question.answer }}
         </p>
@@ -88,6 +94,7 @@ const props = defineProps({
   questions: { type: Array, default: () => [] },
   modelValue: { type: Object, default: () => ({}) },
   readonly: { type: Boolean, default: false },
+  practice: Boolean,
   reviewItems: { type: Array, default: () => [] },
   selectionMode: Boolean,
   selectedKeys: { type: Array, default: () => [] },
@@ -105,6 +112,12 @@ const answers = computed({
 })
 
 const showReview = computed(() => props.reviewItems.length > 0)
+const practiceStatus = {
+  CORRECT: '正确',
+  INCORRECT: '错误',
+  UNANSWERED: '未答',
+  SELF_REVIEW: '自行对照',
+}
 
 const reviewMap = computed(() => {
   const map = {}
@@ -164,6 +177,11 @@ defineExpose({ buildAnswerList })
 </script>
 
 <style scoped>
+.review-options {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
 .question-picker { display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;flex-shrink:0;border:2px solid #b8cbd7;border-radius:50%;background:white;cursor:pointer;color:white;transition:background .15s,border-color .15s; }
 .question-picker.checked { background:#35b5dc;border-color:#35b5dc; }
 .question-picker:disabled { opacity:.35;cursor:not-allowed; }

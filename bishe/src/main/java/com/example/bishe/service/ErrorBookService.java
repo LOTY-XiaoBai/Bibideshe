@@ -1,19 +1,23 @@
 package com.example.bishe.service;
 
 import com.example.bishe.common.BusinessException;
+import com.example.bishe.common.QuestionType;
 import com.example.bishe.dto.ErrorBookItemView;
+import com.example.bishe.dto.ErrorBookSelection;
+import com.example.bishe.dto.QuestionView;
 import com.example.bishe.entity.ErrorBook;
 import com.example.bishe.mapper.ErrorBookMapper;
 import com.example.bishe.mapper.StudentMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
- * 错题本服务(学生端: 2.9 错题加入错题本)。
- * 加入错题本的逻辑在 {@link ExamService}/{@link HomeworkService} 提交答案时触发,
- * 本服务负责查看与移除。
+ * 错题本列表、已收录题目的答案展开与移除。
  */
 @Service
 public class ErrorBookService {
@@ -21,19 +25,23 @@ public class ErrorBookService {
     private final ErrorBookMapper errorBookMapper;
     private final StudentMapper studentMapper;
     private final QuestionService questionService;
+    private final JsonMapper json;
+
+    private record BookQuestion(QuestionView question, boolean archived) {}
 
     public ErrorBookService(ErrorBookMapper errorBookMapper,
                              StudentMapper studentMapper,
-                             QuestionService questionService) {
+                             QuestionService questionService, JsonMapper json) {
         this.errorBookMapper = errorBookMapper;
         this.studentMapper = studentMapper;
         this.questionService = questionService;
+        this.json = json;
     }
 
     /**
-     * 查看某学生的错题本。若题目已被管理员删除, 对应条目的题目内容会替换为
-     * 占位文案"因为一些原因，该题目丢失了"。
+     * 查看错题本。已删除的题目优先展示复习快照，旧条目没有快照时展示占位。
      */
+    @Transactional(readOnly = true)
     public List<ErrorBookItemView> listByStudent(Long studentId) {
         if (studentId == null) {
             throw new BusinessException("学生ID不能为空");
@@ -45,10 +53,52 @@ public class ErrorBookService {
         for (ErrorBook errorBook : errorBookMapper.findByStudentId(studentId)) {
             ErrorBookItemView view = new ErrorBookItemView();
             view.setAddTime(errorBook.getAddTime());
-            view.setQuestion(questionService.resolveQuestion(errorBook.getQuestionId(), errorBook.getQuestionType(), false));
+            var entry = resolveBookQuestion(errorBook, true);
+            view.setQuestion(entry.question());
+            view.setArchived(entry.archived());
             result.add(view);
         }
         return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ErrorBookSelection.Answer> revealAnswers(Long studentId, ErrorBookSelection selection) {
+        return ownedQuestions(studentId, selection).stream().map(entry -> {
+            var question = resolveBookQuestion(entry, false).question();
+            return new ErrorBookSelection.Answer(entry.getQuestionId(), entry.getQuestionType(), question.getAnswer());
+        }).toList();
+    }
+
+    private BookQuestion resolveBookQuestion(ErrorBook entry, boolean hideAnswer) {
+        var question = questionService.resolveQuestion(entry.getQuestionId(), entry.getQuestionType(), hideAnswer);
+        if (question.isLost()) {
+            String snapshot = errorBookMapper.findDeletedQuestion(entry.getQuestionId(), entry.getQuestionType());
+            if (snapshot != null) {
+                var archived = json.readValue(snapshot, QuestionView.class);
+                archived.setLost(true);
+                if (hideAnswer) archived.setAnswer(null);
+                return new BookQuestion(archived, true);
+            }
+        }
+        return new BookQuestion(question, false);
+    }
+
+    List<ErrorBook> ownedQuestions(Long studentId, ErrorBookSelection selection) {
+        if (selection == null || selection.questions() == null || selection.questions().isEmpty()) {
+            throw new BusinessException("请至少选择一道错题");
+        }
+        List<ErrorBook> entries = new ArrayList<>();
+        for (var ref : new LinkedHashSet<>(selection.questions())) {
+            if (ref == null || ref.questionId() == null || !QuestionType.isValid(ref.questionType())) {
+                throw new BusinessException("题目参数无效");
+            }
+            var entry = errorBookMapper.find(studentId, ref.questionId(), ref.questionType());
+            if (entry == null) {
+                throw new BusinessException(403, "该题目不在您的错题本中");
+            }
+            entries.add(entry);
+        }
+        return entries;
     }
 
     /** 从错题本中移除一道题(学生认为已经掌握) */

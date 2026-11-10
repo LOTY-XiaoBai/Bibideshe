@@ -23,11 +23,15 @@ import com.example.bishe.mapper.TeacherMapper;
 import com.example.bishe.util.IdGenerator;
 import com.example.bishe.util.TokenUtil;
 import com.example.bishe.util.PasswordPolicy;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +39,7 @@ import java.util.Map;
 
 /**
  * 管理员账号服务: 处理登录、首次初始化注册与(需已登录管理员)创建新管理员, 以及管理员的高危操作。
- * 首次部署时若管理员数量为 0, 可通过隐藏入口完成初始化注册; 之后仅已登录管理员可继续创建。
+ * 首次初始化需要部署密钥；之后由已登录管理员创建普通管理员。
  * 管理员ID格式为 "admin" + 5位随机数字。
  */
 @Service
@@ -58,6 +62,8 @@ public class AdminService {
     private final HomeworkService homeworkService;
     private final CaptchaService captchaService;
     private final LoginGuardService loginGuardService;
+    private final JdbcTemplate db;
+    private final String bootstrapSecret;
 
     public AdminService(AdminMapper adminMapper,
                         PasswordEncoder passwordEncoder,
@@ -71,7 +77,8 @@ public class AdminService {
                         ExamService examService,
                         HomeworkService homeworkService,
                         CaptchaService captchaService,
-                        LoginGuardService loginGuardService, AdminOperationService operations) {
+                        LoginGuardService loginGuardService, AdminOperationService operations,
+                        JdbcTemplate db, @Value("${app.admin.bootstrap-secret:}") String bootstrapSecret) {
         this.operations=operations;
         this.adminMapper = adminMapper;
         this.passwordEncoder = passwordEncoder;
@@ -86,25 +93,38 @@ public class AdminService {
         this.homeworkService = homeworkService;
         this.captchaService = captchaService;
         this.loginGuardService = loginGuardService;
+        this.db = db;
+        this.bootstrapSecret = bootstrapSecret;
     }
 
     /**
      * 系统是否允许首次初始化注册管理员。
-     * 仅当管理员账号数量为 0 时返回 true。
+     * 部署方启用初始化，且没有现存管理员或已登记的初代管理员时返回 true。
      */
     public boolean canBootstrapRegister() {
-        return adminMapper.countAll() == 0;
+        return bootstrapSecret.length() >= 32 && adminMapper.countAll() == 0
+                && db.queryForObject("SELECT admin_id FROM initial_admin_config WHERE id=1", String.class) == null;
     }
 
     /**
      * 首次部署时初始化注册管理员。
      * 仅当系统中尚无任何管理员账号时允许调用。
      */
+    @Transactional
     public Admin bootstrapRegister(AdminRegisterRequest request) {
-        if (!canBootstrapRegister()) {
-            throw new BusinessException("系统已存在管理员账号，无法再次注册");
+        String supplied = request == null ? null : request.getBootstrapSecret();
+        if (bootstrapSecret.length() < 32 || supplied == null || supplied.length() > 1024
+                || !MessageDigest.isEqual(bootstrapSecret.getBytes(StandardCharsets.UTF_8),
+                supplied.getBytes(StandardCharsets.UTF_8))) {
+            throw new BusinessException(403, "首次初始化未启用或部署密钥无效");
         }
-        return createAdmin(request);
+        String initialized = db.queryForObject("SELECT admin_id FROM initial_admin_config WHERE id=1 FOR UPDATE", String.class);
+        if (initialized != null || adminMapper.countAll() != 0) {
+            throw new BusinessException(409, "系统已初始化管理员");
+        }
+        Admin admin = createAdmin(request);
+        db.update("UPDATE initial_admin_config SET admin_id=? WHERE id=1", admin.getAdminId());
+        return admin;
     }
 
     /**

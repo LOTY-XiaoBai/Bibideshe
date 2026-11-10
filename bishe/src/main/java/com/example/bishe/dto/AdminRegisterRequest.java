@@ -11,4 +11,7 @@ public class AdminRegisterRequest {
 
     /** 管理员密码 */
     private String password;
+
+    /** 仅首次初始化使用的部署密钥 */
+    private String bootstrapSecret;
 }

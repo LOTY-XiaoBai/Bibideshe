@@ -1,6 +1,7 @@
 package com.example.bishe.service;
 
 import com.example.bishe.common.*;
+import com.example.bishe.mapper.AdvertisementMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
@@ -17,12 +18,16 @@ public class MerchantCommerceService {
     private final MerchantService merchants;
     private final ShopService shop;
     private final JsonMapper json;
-    private static final String PRODUCT="SELECT p.ad_id AS id,p.merchant_id AS merchantId,p.title,p.content,p.image_url AS imageUrl,p.price,p.score,p.review_status AS reviewStatus,p.review_reason AS reviewReason,p.revision,p.is_deleted AS withdrawn,p.create_time AS createdAt,m.name AS merchantName,m.city,d.blocks FROM advertisement p JOIN merchant m ON m.merchant_id=p.merchant_id LEFT JOIN product_detail d ON d.ad_id=p.ad_id";
+    private static final String PRODUCT="SELECT p.ad_id AS id,p.merchant_id AS merchantId,p.title,p.content,p.image_url AS imageUrl,p.price,p.score,p.review_status AS reviewStatus,p.review_reason AS reviewReason,p.revision,p.is_deleted AS withdrawn,p.create_time AS createdAt,m.name AS merchantName,m.city,d.blocks,"+AdvertisementMapper.TAG_CODES+" AS tagCodes FROM advertisement p JOIN merchant m ON m.merchant_id=p.merchant_id LEFT JOIN product_detail d ON d.ad_id=p.ad_id";
     private static final String CAMPAIGN="SELECT c.id,c.merchant_id AS merchantId,c.product_id AS productId,c.title,c.content,c.image_url AS imageUrl,c.review_status AS reviewStatus,c.review_reason AS reviewReason,c.revision,c.carousel_enabled AS carouselEnabled,c.created_at AS createdAt,m.name AS merchantName,m.city,c.target_type AS targetType,p.title AS productTitle,p.price,p.review_status AS productStatus,p.is_deleted AS productWithdrawn FROM merchant_campaign c JOIN merchant m ON m.merchant_id=c.merchant_id LEFT JOIN advertisement p ON p.ad_id=c.product_id";
     public MerchantCommerceService(JdbcTemplate db,MerchantService merchants,ShopService shop,JsonMapper json){this.db=db;this.merchants=merchants;this.shop=shop;this.json=json;}
     public Map<String,Object> stats(){
         long id=merchants.requireMerchant();
         return Map.of("products",db.queryForObject("SELECT COUNT(*) FROM advertisement WHERE merchant_id=? AND is_deleted=0",Long.class,id),"campaigns",db.queryForObject("SELECT COUNT(*) FROM merchant_campaign WHERE merchant_id=? AND review_status='APPROVED'",Long.class,id),"pendingOrders",db.queryForObject("SELECT COUNT(*) FROM order_record WHERE merchant_id=? AND status=0",Long.class,id),"reviews",db.queryForObject("SELECT COUNT(*) FROM order_evaluation e JOIN order_record o ON o.order_id=e.order_id WHERE o.merchant_id=?",Long.class,id));
+    }
+    public List<?> productTags() {
+        merchants.requireMerchant();
+        return ShopCatalog.tags();
     }
     public List<Map<String,Object>> productOptions(String keyword){
         return db.queryForList("SELECT ad_id AS id,title,price FROM advertisement WHERE merchant_id=? AND review_status='APPROVED' AND is_deleted=0 AND title LIKE ? ORDER BY ad_id DESC LIMIT 50",merchants.requireMerchant(),"%"+keyword.substring(0,Math.min(100,keyword.length()))+"%");
@@ -40,13 +45,16 @@ public class MerchantCommerceService {
         String base=product?PRODUCT:CAMPAIGN;
         long total=db.queryForObject("SELECT COUNT(*) FROM ("+base+where+") merchant_rows",Long.class,args.toArray());
         size=Math.max(1,Math.min(size,50));page=Math.max(1,page);args.add(size);args.add((page-1)*size);
-        return Map.of("total",total,"list",db.queryForList(base+where+" ORDER BY "+alias+"."+(product?"ad_id":"id")+" DESC LIMIT ? OFFSET ?",args.toArray()));
+        var rows=db.queryForList(base+where+" ORDER BY "+alias+"."+(product?"ad_id":"id")+" DESC LIMIT ? OFFSET ?",args.toArray());
+        if (product) rows.forEach(this::readTags);
+        return Map.of("total",total,"list",rows);
     }
     @Transactional
     public Map<String,Object> saveProduct(Long id,Map<String,Object> b){
         long owner=merchants.requireMerchant();
         var profile=merchants.publicProfile(owner);
         String title=MerchantService.text(b,"title",100,true),content=MerchantService.text(b,"content",1000,true),image=image(b),blocks=blocks(b);
+        List<String> tags = b.containsKey("tags") ? ShopCatalog.productTags(b.get("tags")) : null;
         BigDecimal price;
         try{price=new BigDecimal(String.valueOf(b.get("price")));if(price.signum()<=0||price.scale()>2||price.compareTo(new BigDecimal("99999999.99"))>0)throw new IllegalArgumentException();}catch(Exception e){throw new BusinessException("价格须大于0，最多两位小数");}
         if(id==null){
@@ -58,7 +66,17 @@ public class MerchantCommerceService {
             db.update("UPDATE merchant_campaign SET review_status='PENDING',carousel_enabled=0,review_reason='关联商品已修改，请重新审核',revision=revision+1 WHERE product_id=? AND review_status<>'WITHDRAWN'",id);
         }
         db.update("INSERT INTO product_detail(ad_id,origin,blocks) VALUES(?,?,?) ON DUPLICATE KEY UPDATE origin=VALUES(origin),blocks=VALUES(blocks)",id,profile.get("city"),blocks);
-        return db.queryForMap(PRODUCT+" WHERE p.ad_id=?",id);
+        if (tags != null) {
+            db.update("DELETE FROM shop_product_tag WHERE product_id=?", id);
+            for (String tag : tags) db.update("INSERT INTO shop_product_tag(product_id,tag_code) VALUES(?,?)", id, tag);
+        }
+        return readTags(db.queryForMap(PRODUCT+" WHERE p.ad_id=?",id));
+    }
+
+    private Map<String, Object> readTags(Map<String, Object> row) {
+        String codes = Objects.toString(row.remove("tagCodes"), "");
+        row.put("tags", codes.isEmpty() ? List.of() : List.of(codes.split(",")));
+        return row;
     }
     @Transactional
     public Map<String,Object> saveCampaign(Long id,Map<String,Object> b){

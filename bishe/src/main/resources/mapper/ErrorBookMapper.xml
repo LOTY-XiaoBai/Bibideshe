@@ -33,4 +33,14 @@
         DELETE FROM error_book WHERE student_id = #{studentId}
     </delete>
 
+    <insert id="archiveDeletedQuestion">
+        INSERT IGNORE INTO error_book_deleted_question (question_id, question_type, snapshot_json)
+        VALUES (#{questionId}, #{questionType}, #{snapshot})
+    </insert>
+
+    <select id="findDeletedQuestion" resultType="string">
+        SELECT snapshot_json FROM error_book_deleted_question
+        WHERE question_id = #{questionId} AND question_type = #{questionType}
+    </select>
+
 </mapper>

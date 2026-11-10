@@ -13,6 +13,7 @@ import com.example.bishe.entity.QuestionAnswer;
 import com.example.bishe.entity.QuestionChoice;
 import com.example.bishe.entity.QuestionChoiceOption;
 import com.example.bishe.entity.QuestionJudge;
+import com.example.bishe.mapper.ErrorBookMapper;
 import com.example.bishe.mapper.ExamQuestionAnswerMapper;
 import com.example.bishe.mapper.ExamQuestionMapper;
 import com.example.bishe.mapper.HomeworkQuestionAnswerMapper;
@@ -27,14 +28,18 @@ import com.example.bishe.mapper.UserHomeworkRecordMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -60,6 +65,8 @@ public class QuestionService {
     private final HomeworkQuestionMapper homeworkQuestionMapper;
     private final HomeworkQuestionAnswerMapper homeworkQuestionAnswerMapper;
     private final UserHomeworkRecordMapper userHomeworkRecordMapper;
+    private final ErrorBookMapper errorBookMapper;
+    private final JsonMapper json;
 
     public QuestionService(QuestionChoiceMapper questionChoiceMapper,
                             QuestionChoiceOptionMapper questionChoiceOptionMapper,
@@ -71,7 +78,8 @@ public class QuestionService {
                             UserExamRecordMapper userExamRecordMapper,
                             HomeworkQuestionMapper homeworkQuestionMapper,
                             HomeworkQuestionAnswerMapper homeworkQuestionAnswerMapper,
-                            UserHomeworkRecordMapper userHomeworkRecordMapper) {
+                            UserHomeworkRecordMapper userHomeworkRecordMapper,
+                            ErrorBookMapper errorBookMapper, JsonMapper json) {
         this.questionChoiceMapper = questionChoiceMapper;
         this.questionChoiceOptionMapper = questionChoiceOptionMapper;
         this.questionJudgeMapper = questionJudgeMapper;
@@ -83,6 +91,8 @@ public class QuestionService {
         this.homeworkQuestionMapper = homeworkQuestionMapper;
         this.homeworkQuestionAnswerMapper = homeworkQuestionAnswerMapper;
         this.userHomeworkRecordMapper = userHomeworkRecordMapper;
+        this.errorBookMapper = errorBookMapper;
+        this.json = json;
     }
 
     // ==================== 教师端: 做题上传到题库 ====================
@@ -273,10 +283,12 @@ public class QuestionService {
     @Transactional
     public void deleteQuestion(Long questionId, Integer questionType) {
         requireValidType(questionType);
-        if (!existsQuestion(questionId, questionType)) {
+        QuestionView snapshot = resolveQuestion(questionId, questionType, false);
+        if (snapshot.isLost()) {
             throw new BusinessException("题目不存在");
         }
 
+        errorBookMapper.archiveDeletedQuestion(questionId, questionType, json.writeValueAsString(snapshot));
         fixExamAnswersForDeletedQuestion(questionId, questionType);
         fixHomeworkAnswersForDeletedQuestion(questionId, questionType);
 
@@ -531,6 +543,26 @@ public class QuestionService {
             return normalizeJudge(correctAnswer).equals(normalizeJudge(studentAnswer));
         }
         return normalize(correctAnswer).equalsIgnoreCase(normalize(studentAnswer));
+    }
+
+    static boolean matchesObjectiveAnswer(String correct, String student, int type) {
+        return correct != null && normalizeObjectiveAnswer(correct, type).equals(normalizeObjectiveAnswer(student, type));
+    }
+
+    private static String normalizeObjectiveAnswer(String answer, int type) {
+        String value = answer.trim().replaceAll("\\s+", "").toUpperCase(Locale.ROOT).replace('，', ',');
+        if (type == QuestionType.JUDGE) {
+            if (Set.of("TRUE", "1", "正确", "对", "T", "YES").contains(value)) return "TRUE";
+            if (Set.of("FALSE", "0", "错误", "错", "F", "NO").contains(value)) return "FALSE";
+        }
+        if (type == QuestionType.CHOICE) {
+            var options = new TreeSet<Character>();
+            for (char option : value.toCharArray()) {
+                if (option != ',') options.add(option);
+            }
+            return options.toString();
+        }
+        return value;
     }
 
     private String normalizeJudge(String value) {
