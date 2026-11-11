@@ -15,8 +15,14 @@ public interface CheckInRecordMapper {
     /** 新增签到记录, 自增主键回填 */
     int insert(CheckInRecord record);
 
+    int insertChallenge(CheckInRecord record);
+
     /** 按签到ID查询 */
     CheckInRecord findById(Long checkInId);
+
+    CheckInRecord findByIdForUpdate(Long checkInId);
+
+    String findLatestLocation(@Param("courseId") Long courseId, @Param("teacherId") Long teacherId);
 
     /** 查询某课程的全部签到记录(按发布时间倒序) */
     List<CheckInRecord> findByCourseId(@Param("courseId") Long courseId,

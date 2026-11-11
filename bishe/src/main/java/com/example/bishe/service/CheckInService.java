@@ -1,9 +1,11 @@
 package com.example.bishe.service;
 
 import com.example.bishe.common.BusinessException;
+import com.example.bishe.dto.CheckInBounds;
 import com.example.bishe.dto.CheckInDetailVO;
 import com.example.bishe.dto.CheckInPublishRequest;
 import com.example.bishe.dto.CheckInRecordVO;
+import com.example.bishe.dto.CheckInRequest;
 import com.example.bishe.dto.CheckInStatusUpdateRequest;
 import com.example.bishe.dto.CheckInStudentRecordVO;
 import com.example.bishe.entity.CheckInRecord;
@@ -15,10 +17,13 @@ import com.example.bishe.mapper.CheckInUserMapper;
 import com.example.bishe.mapper.CourseMapper;
 import com.example.bishe.mapper.CoursePersonnelMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +35,7 @@ import java.util.Map;
  */
 @Service
 public class CheckInService {
+    public record LocationPreview(MerchantLocationService.Point point, boolean inside) {}
 
     /** 签到状态常量 */
     private static final int CHECK_IN_ACTIVE = 0;   // 进行中
@@ -38,7 +44,6 @@ public class CheckInService {
     /** 学生签到状态常量 */
     private static final int STUDENT_ABSENT = 0;    // 缺勤
     private static final int STUDENT_PRESENT = 1;   // 已签到
-    private static final int STUDENT_LATE = 2;      // 迟到
 
     /** 默认每页条数 */
     private static final int DEFAULT_PAGE_SIZE = 10;
@@ -49,18 +54,20 @@ public class CheckInService {
     private final CoursePersonnelMapper coursePersonnelMapper;
     private final CourseService courseService;
     private final ClassroomService classroom;
+    private final MerchantLocationService location;
 
     public CheckInService(CheckInRecordMapper checkInRecordMapper,
                           CheckInUserMapper checkInUserMapper,
                           CourseMapper courseMapper,
                           CoursePersonnelMapper coursePersonnelMapper,
-                          CourseService courseService, ClassroomService classroom) {
+                          CourseService courseService, ClassroomService classroom, MerchantLocationService location) {
         this.checkInRecordMapper = checkInRecordMapper;
         this.checkInUserMapper = checkInUserMapper;
         this.courseMapper = courseMapper;
         this.coursePersonnelMapper = coursePersonnelMapper;
         this.courseService = courseService;
         this.classroom = classroom;
+        this.location = location;
     }
 
     // ==================== 教师端 ====================
@@ -104,12 +111,27 @@ public class CheckInService {
         CheckInRecord record = new CheckInRecord();
         record.setCourseId(request.getCourseId());
         record.setPublisherId(request.getTeacherId());
-        record.setPublishTime(LocalDateTime.now());
+        record.setPublishTime(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
         record.setDeadline(request.getDeadline());
         record.setAttendeeCount(0);
         record.setStatus(CHECK_IN_ACTIVE);
         record.setScoreValue(request.getScoreValue());
+        if ("CODE".equals(request.getMode())) {
+            record.setMode("CODE");
+            record.setConfiguration(CheckInCode.newSeed());
+        } else if ("GESTURE".equals(request.getMode())) {
+            record.setMode("GESTURE");
+            record.setConfiguration(encodeGesture(request.getGesture()));
+        } else if ("LOCATION".equals(request.getMode())) {
+            if (request.getBounds() == null) throw new BusinessException("请先绘制签到范围");
+            if (!location.available()) throw new BusinessException(503, "请联系管理员配置高德 Web 服务 Key");
+            record.setMode("LOCATION");
+            record.setConfiguration(request.getBounds().encode());
+        } else if (request.getMode() != null) {
+            throw new BusinessException("请选择有效的签到方式");
+        }
         checkInRecordMapper.insert(record);
+        if (record.getConfiguration() != null) checkInRecordMapper.insertChallenge(record);
 
         // 为每位学生创建签到明细(初始缺勤)
         List<CheckInUser> userList = new ArrayList<>();
@@ -131,18 +153,20 @@ public class CheckInService {
     /**
      * 教师手动结束签到。
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void endCheckIn(Long teacherId, Long checkInId) {
         CheckInRecord record = checkInRecordMapper.findById(checkInId);
         if (record == null) {
             throw new BusinessException("签到记录不存在");
         }
         requireOwnedCourse(teacherId, record.getCourseId());
+        courseMapper.findByIdForUpdate(record.getCourseId());
+        record = checkInRecordMapper.findByIdForUpdate(checkInId);
+        if (record == null) throw new BusinessException("签到记录不存在");
 
         // 检查是否已过期(自动结束)
         autoEndIfExpired(record);
-        CheckInRecord latest = checkInRecordMapper.findById(checkInId);
-        if (latest.getStatus() != null && latest.getStatus() == CHECK_IN_ENDED) {
+        if (Integer.valueOf(CHECK_IN_ENDED).equals(record.getStatus())) {
             throw new BusinessException("签到已结束, 请勿重复操作");
         }
 
@@ -244,6 +268,7 @@ public class CheckInService {
             vo.setAttendeeCount(r.getAttendeeCount());
             vo.setStatus(r.getStatus());
             vo.setScoreValue(r.getScoreValue());
+            vo.setMode(r.getMode());
             vos.add(vo);
         }
 
@@ -278,12 +303,17 @@ public class CheckInService {
 
     // ==================== 学生端 ====================
 
-    /**
-     * 学生签到。
-     * 截止时间前签到记"已签到", 截止后记"迟到"; 签到结束后不可签到。
-     */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void studentCheckIn(Long checkInId, Long studentId) {
+        CheckInRequest request = new CheckInRequest();
+        request.setCheckInId(checkInId);
+        studentCheckIn(request, studentId);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public void studentCheckIn(CheckInRequest request, Long studentId) {
+        LocalDateTime receivedAt = LocalDateTime.now();
+        Long checkInId = request.getCheckInId();
         if (checkInId == null || studentId == null) {
             throw new BusinessException("签到ID和学生ID不能为空");
         }
@@ -292,47 +322,135 @@ public class CheckInService {
         if (record == null) {
             throw new BusinessException("签到记录不存在");
         }
+        if ("LOCATION".equals(record.getMode())) {
+            requireOpen(record, receivedAt);
+            requireCheckInUser(record, studentId);
+            if (!locateWithin(CheckInBounds.decode(record.getConfiguration()), request.getPosition()).inside()) {
+                throw new BusinessException("当前位置在签到范围外");
+            }
+        }
+        courseMapper.findByIdForUpdate(record.getCourseId());
+        record = checkInRecordMapper.findByIdForUpdate(checkInId);
+        if (record == null) throw new BusinessException("签到记录不存在");
 
-        // 检查学生是否在该课程中
-        CoursePersonnel enrollment = coursePersonnelMapper.find(record.getCourseId(), studentId);
-        if (enrollment == null) {
-            throw new BusinessException("您未加入该课程, 无法签到");
+        requireOpen(record, receivedAt);
+        requireCheckInUser(record, studentId);
+
+        if ("CODE".equals(record.getMode()) && !CheckInCode.accepts(record.getConfiguration(),
+                CheckInCode.elapsedMillis(record.getPublishTime(), receivedAt), request.getCode())) {
+            throw new BusinessException("签到码错误或已过期，请查看大屏上的当前签到码");
+        }
+        if ("GESTURE".equals(record.getMode()) && !record.getConfiguration().equals(encodeGesture(request.getGesture()))) {
+            throw new BusinessException("手势错误，请按大屏显示的顺序重新连线");
         }
 
-        // 检查签到是否已过期, 若过期则自动结束
-        autoEndIfExpired(record);
-
-        // 检查学生签到记录
-        CheckInUser user = checkInUserMapper.findByCheckInIdAndStudentId(checkInId, studentId);
-        if (user == null) {
-            throw new BusinessException("签到记录异常, 请联系教师");
-        }
-
-        if (user.getStatus() != null && user.getStatus() != STUDENT_ABSENT) {
-            throw new BusinessException("您已签到, 请勿重复操作");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        int signStatus;
-
-        // 签到已结束后不再允许签到(已由autoEndIfExpired处理过期)
-        CheckInRecord latest = checkInRecordMapper.findById(checkInId);
-        if (latest.getStatus() != null && latest.getStatus() == CHECK_IN_ENDED) {
-            throw new BusinessException("签到已结束, 无法签到");
-        }
-
-        // 判断签到状态: 截止前签到=正常, 截止后签到=迟到
-        if (now.isAfter(record.getDeadline())) {
-            signStatus = STUDENT_LATE;
-        } else {
-            signStatus = STUDENT_PRESENT;
-        }
-
-        checkInUserMapper.checkIn(checkInId, studentId, signStatus, now);
+        checkInUserMapper.checkIn(checkInId, studentId, STUDENT_PRESENT, receivedAt);
         syncAttendeeCount(checkInId);
         // 签到后回写课程成绩
         courseService.recalculateAndUpdateStudentScore(record.getCourseId(), studentId);
         courseService.updateComprehensiveScoreForStudent(studentId);
+    }
+
+    private void requireOpen(CheckInRecord record, LocalDateTime receivedAt) {
+        if (Integer.valueOf(CHECK_IN_ENDED).equals(record.getStatus()) || !receivedAt.isBefore(record.getDeadline())
+                || classroom.active(record.getCourseId()) == null) {
+            throw new BusinessException("签到已结束, 无法签到");
+        }
+    }
+
+    private void requireCheckInUser(CheckInRecord record, Long studentId) {
+        if (coursePersonnelMapper.find(record.getCourseId(), studentId) == null) {
+            throw new BusinessException("您未加入该课程, 无法签到");
+        }
+        CheckInUser user = checkInUserMapper.findByCheckInIdAndStudentId(record.getCheckInId(), studentId);
+        if (user == null) throw new BusinessException("签到记录异常, 请联系教师");
+        if (user.getStatus() != null && user.getStatus() != STUDENT_ABSENT) {
+            throw new BusinessException("您已签到, 请勿重复操作");
+        }
+    }
+
+    private LocationPreview locateWithin(CheckInBounds bounds, CheckInRequest.Position position) {
+        if (position == null || position.latitude() == null || position.longitude() == null) {
+            throw new BusinessException("请先获取当前位置");
+        }
+        var point = location.mapPosition(position.latitude(), position.longitude());
+        return new LocationPreview(point, bounds.contains(point.latitude(), point.longitude()));
+    }
+
+    public CheckInBounds locationBoundsForStudent(Long checkInId, Long studentId) {
+        CheckInRecord record = checkInRecordMapper.findById(checkInId);
+        if (record == null || !"LOCATION".equals(record.getMode())) {
+            throw new BusinessException("定位签到不存在");
+        }
+        requireOpen(record, LocalDateTime.now());
+        requireCheckInUser(record, studentId);
+        return CheckInBounds.decode(record.getConfiguration());
+    }
+
+    public LocationPreview previewLocation(Long checkInId, Long studentId, CheckInRequest.Position position) {
+        return locateWithin(locationBoundsForStudent(checkInId, studentId), position);
+    }
+
+    public CheckInBounds locationDefault(Long teacherId, Long courseId) {
+        requireOwnedCourse(teacherId, courseId);
+        String saved = checkInRecordMapper.findLatestLocation(courseId, teacherId);
+        return saved == null ? null : CheckInBounds.decode(saved);
+    }
+
+    public Map<String, Object> display(Long teacherId, Long checkInId) {
+        CheckInRecord record = checkInRecordMapper.findById(checkInId);
+        if (record == null) throw new BusinessException("签到记录不存在");
+        Course course = requireOwnedCourse(teacherId, record.getCourseId());
+        autoEndIfExpired(record);
+        LocalDateTime now = LocalDateTime.now();
+        long remaining = Math.max(0, Duration.between(now, record.getDeadline()).toMillis());
+        boolean ended = Integer.valueOf(CHECK_IN_ENDED).equals(record.getStatus()) || remaining == 0;
+        Map<String, Object> display = new HashMap<>();
+        display.put("courseId", record.getCourseId());
+        display.put("courseName", course.getCourseName());
+        display.put("mode", record.getMode());
+        display.put("attendeeCount", record.getAttendeeCount());
+        display.put("ended", ended);
+        display.put("remainingMs", ended ? 0 : remaining);
+        if (!ended && "CODE".equals(record.getMode())) {
+            long elapsed = CheckInCode.elapsedMillis(record.getPublishTime(), now);
+            display.put("code", CheckInCode.value(record.getConfiguration(), elapsed / CheckInCode.PERIOD_MS));
+            display.put("refreshMs", Math.min(remaining, CheckInCode.PERIOD_MS - elapsed % CheckInCode.PERIOD_MS));
+        } else if (!ended && "GESTURE".equals(record.getMode())) {
+            display.put("gesture", record.getConfiguration().chars().mapToObj(point -> point - '0').toList());
+        }
+        return display;
+    }
+
+    private String encodeGesture(List<Integer> points) {
+        if (points == null || points.isEmpty() || points.size() > 9) {
+            throw new BusinessException("请在九宫格连接 4 至 9 个不同的点");
+        }
+        StringBuilder gesture = new StringBuilder(9);
+        int previous = -1;
+        boolean[] visited = new boolean[9];
+        for (Integer point : points) {
+            if (point == null || point < 1 || point > 9 || visited[point - 1]) {
+                throw new BusinessException("手势只能连接九宫格内不重复的点");
+            }
+            int index = point - 1;
+            if (previous >= 0) {
+                int rowSum = previous / 3 + index / 3;
+                int columnSum = previous % 3 + index % 3;
+                if (rowSum % 2 == 0 && columnSum % 2 == 0) {
+                    int middle = rowSum / 2 * 3 + columnSum / 2;
+                    if (!visited[middle]) {
+                        gesture.append(middle + 1);
+                        visited[middle] = true;
+                    }
+                }
+            }
+            gesture.append(point);
+            visited[index] = true;
+            previous = index;
+        }
+        if (gesture.length() < 4) throw new BusinessException("请连接至少 4 个点");
+        return gesture.toString();
     }
 
     /**

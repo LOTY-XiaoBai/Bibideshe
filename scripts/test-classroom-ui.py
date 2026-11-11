@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import random
+import re
 import shutil
 import subprocess
 import time
@@ -45,6 +46,7 @@ def token(user, role):
 
 def login(browser, user, role, name):
     context = browser.new_context(viewport={'width': 1440, 'height': 1000}, permissions=['camera', 'microphone'])
+    context.route(re.compile(r'^https://(fonts\.googleapis\.com|unpkg\.com|placehold\.co)/'), lambda route: route.abort())
     auth = {'token': token(user, role), 'role': role, 'profile': {'teacherId' if role == 'TEACHER' else 'studentId': user, 'name' if role == 'TEACHER' else 'nickname': name}}
     context.add_init_script('const a = ' + json.dumps(auth) + "; localStorage.setItem('educhat_token',a.token);localStorage.setItem('educhat_role',a.role);localStorage.setItem('educhat_profile',JSON.stringify(a.profile));")
     page = context.new_page()
@@ -98,6 +100,7 @@ try:
         sql(f"INSERT INTO course_personnel(course_id,student_id,student_score) VALUES({cid},{students[1]},0)")
         tp.get_by_role('button', name='开始上课', exact=True).click()
         tp.get_by_role('button', name='本地授课 签到、随机点名与课堂小测').click()
+        expect(tp.get_by_text('本地授课 · 准备上课')).to_be_visible()
         expect(tp.get_by_role('button', name='开始上课', exact=True)).to_be_visible()
         tp.get_by_role('button', name='开始上课', exact=True).click()
         expect(tp.get_by_text('本地授课 · 正在上课')).to_be_visible()
@@ -109,11 +112,48 @@ try:
         expect(tp.get_by_role('button', name='再抽一次', exact=True)).to_be_enabled()
         tp.screenshot(path=str(out / '02-local-class.png'))
         tp.get_by_role('button', name='发布签到', exact=True).first.click()
+        tp.locator('.checkin-panel').get_by_text('签到码', exact=True).click()
         tp.locator('.checkin-panel').get_by_role('button', name='发布签到', exact=True).click()
+        expect(tp.get_by_role('heading', name='签到展示')).to_be_visible()
+        displayed = tp.get_by_label('当前签到码')
+        expect(displayed).to_have_text(re.compile(r'^\d{4}$'))
+        previous = displayed.inner_text()
+        expect(displayed).to_have_text(re.compile(rf'^(?!{previous}$)\d{{4}}$'), timeout=8000)
         expect(sp.locator('.checkin-dot')).to_be_visible(timeout=20000)
         sp.locator('a[href="/student/check-in"]').click()
         sp.get_by_role('button', name='立即签到', exact=True).click()
+        sign_dialog = sp.get_by_role('dialog', name='签到码签到')
+        expect(displayed).to_have_text(re.compile(r'^\d{4}$'))
+        sign_dialog.get_by_placeholder('输入大屏上的 4 位签到码').fill(displayed.inner_text())
+        sign_dialog.get_by_role('button', name='提交签到', exact=True).click()
         expect(sp.locator('.checkin-dot')).to_have_count(0, timeout=20000)
+        expect(tp.get_by_text('1 人已签到')).to_be_visible()
+        tp.get_by_role('button', name='返回课堂', exact=True).click()
+        panel = tp.locator('.checkin-panel')
+        panel.get_by_role('button', name='打开大屏', exact=True).click()
+        expect(tp.get_by_text('1 人已签到')).to_be_visible()
+        tp.get_by_role('button', name='返回课堂', exact=True).click()
+        panel.get_by_text('手势连线', exact=True).click()
+        pad = panel.get_by_role('group', name='手势九宫格')
+        first = pad.get_by_role('button', name='点 1', exact=True).bounding_box()
+        third = pad.get_by_role('button', name='点 3', exact=True).bounding_box()
+        sixth = pad.get_by_role('button', name='点 6', exact=True).bounding_box()
+        center = lambda point: (point['x'] + point['width'] / 2, point['y'] + point['height'] / 2)
+        tp.mouse.move(*center(first))
+        tp.mouse.down()
+        tp.mouse.move(*center(third))
+        tp.mouse.move(*center(sixth))
+        tp.mouse.up()
+        expect(panel.get_by_text('已连接 4 个点')).to_be_visible()
+        panel.get_by_role('button', name='发布签到', exact=True).click()
+        expect(tp.get_by_role('img', name='大屏手势')).to_be_visible()
+        sp.get_by_role('button', name='立即签到', exact=True).click()
+        gesture = sp.get_by_role('dialog', name='手势签到')
+        for point in [1, 2, 3, 6]:
+            gesture.get_by_role('button', name=f'点 {point}', exact=True).press('Enter')
+        gesture.get_by_role('button', name='提交签到', exact=True).click()
+        expect(sp.locator('.checkin-dot')).to_have_count(0, timeout=20000)
+        tp.get_by_role('button', name='返回课堂', exact=True).click()
         tp.get_by_role('button', name='结束本次上课', exact=True).click()
         tp.locator('.el-message-box').get_by_role('button', name='确定', exact=True).click()
         expect(tp.get_by_role('heading', name='我的授课')).to_be_visible()
@@ -146,6 +186,16 @@ try:
         sp2.wait_for_function("document.querySelector('video')?.videoWidth > 0")
         sp.get_by_role('button', name='重新连接', exact=True).click()
         expect(sp.get_by_text('网络授课 · 已连接')).to_be_visible(timeout=30000)
+        tp.get_by_role('button', name='发布签到', exact=True).first.click()
+        tp.locator('.checkin-panel').get_by_text('签到码', exact=True).click()
+        tp.locator('.checkin-panel').get_by_role('button', name='发布签到', exact=True).click()
+        expect(tp.get_by_role('heading', name='签到展示')).to_be_visible()
+        expect(sp.get_by_text('网络授课 · 已连接')).to_be_visible()
+        sp.wait_for_function("document.querySelector('video')?.videoWidth > 0")
+        tp.get_by_role('button', name='结束签到', exact=True).click()
+        tp.get_by_role('button', name='确认结束签到', exact=True).click()
+        expect(tp.get_by_role('heading', name='签到已结束')).to_be_visible()
+        tp.get_by_role('button', name='返回课堂', exact=True).click()
         tp.get_by_role('button', name='结束本次上课', exact=True).click()
         tp.locator('.el-message-box').get_by_role('button', name='确定', exact=True).click()
         expect(sp.get_by_role('heading', name='本次上课已结束')).to_be_visible(timeout=20000)
@@ -157,7 +207,7 @@ try:
         expect(tp.get_by_text('上课提醒 · 前5分钟', exact=True)).to_be_visible(timeout=20000)
         tp.locator('.el-message-box').get_by_role('button', name='稍后上课').click()
         assert not errors, errors
-        print('PASS: creation, application review, local notification, multi-draw, check-in dot, camera+microphone, dual video, multiple viewers, reconnect, end and reminder')
+        print('PASS: course workflow, rotating code and gesture check-ins, classroom display, live media, reconnect and reminder')
         browser.close()
 finally:
     # 仅清理本次随机教师创建的数据；不操作其他账号。

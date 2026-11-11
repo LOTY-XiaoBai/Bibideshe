@@ -3,6 +3,7 @@ package com.example.bishe.controller;
 import com.example.bishe.common.AuthContext;
 import com.example.bishe.common.Result;
 import com.example.bishe.dto.CheckInDetailVO;
+import com.example.bishe.dto.CheckInBounds;
 import com.example.bishe.dto.CheckInPublishRequest;
 import com.example.bishe.dto.CheckInRequest;
 import com.example.bishe.dto.CheckInStatusUpdateRequest;
@@ -12,6 +13,7 @@ import com.example.bishe.entity.CheckInUser;
 import com.example.bishe.service.CheckInService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,6 +67,17 @@ public class CheckInController {
         return Result.success(checkInService.getCheckInDetail(teacherId, checkInId));
     }
 
+    @GetMapping("/display/{checkInId}")
+    public Result<Map<String, Object>> display(@PathVariable Long checkInId, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return Result.success(checkInService.display(AuthContext.requireTeacherId(), checkInId));
+    }
+
+    @GetMapping("/location-default/{courseId}")
+    public Result<CheckInBounds> locationDefault(@PathVariable Long courseId) {
+        return Result.success(checkInService.locationDefault(AuthContext.requireTeacherId(), courseId));
+    }
+
     /** 教师修改学生签到状态(签到结束后可操作) */
     @Operation(summary = "教师修改学生签到状态")
     @PostMapping("/update-status")
@@ -95,12 +108,19 @@ public class CheckInController {
 
     // ==================== 学生端 ====================
 
+    @PostMapping("/location-preview/{checkInId}")
+    public Result<CheckInService.LocationPreview> previewLocation(@PathVariable Long checkInId,
+            @RequestBody CheckInRequest.Position position, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return Result.success(checkInService.previewLocation(checkInId, AuthContext.requireStudentId(), position));
+    }
+
     /** 学生签到 */
     @Operation(summary = "学生签到")
     @PostMapping("/sign")
     public Result<Void> sign(@RequestBody CheckInRequest request) {
         Long studentId = AuthContext.requireStudentId();
-        checkInService.studentCheckIn(request.getCheckInId(), studentId);
+        checkInService.studentCheckIn(request, studentId);
         return Result.success("签到成功", null);
     }
 

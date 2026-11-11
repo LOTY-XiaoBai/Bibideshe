@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
  */
 @Data
 public class CheckInRecordVO {
+    private String mode;
 
     /** 签到ID */
     private Long checkInId;

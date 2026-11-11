@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 教师发布签到请求。
@@ -16,6 +17,9 @@ public class CheckInPublishRequest {
 
     /** 课程ID */
     private Long courseId;
+    private String mode;
+    private List<Integer> gesture;
+    private CheckInBounds bounds;
 
     /** 签到截止时间 */
     private LocalDateTime deadline;

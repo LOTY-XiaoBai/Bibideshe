@@ -28,7 +28,7 @@ docker compose --env-file .env.demo --project-name bishe-demo down
 
 不要额外加 `-v`，该参数会删除演示数据库等数据卷。
 
-## 项目里保留的 19 个 SQL 都参与自动启动
+## 项目里的 21 个 SQL 都参与自动启动
 
 它们是程序运行所需的建表/迁移代码，**不是数据库数据备份，需要提交到 Git**。
 
@@ -53,6 +53,8 @@ docker compose --env-file .env.demo --project-name bishe-demo down
 | `bishe/sql/23_error_book_redo.sql` | 错题重做、历史记录与已删除题目的复习快照 |
 | `bishe/sql/24_initial_admin.sql` | 初代管理员归属和地图配置 |
 | `bishe/sql/25_shop_catalog_filters.sql` | 可选商品标签 |
+| `bishe/sql/26_check_in_challenges.sql` | 签到方式、凭证和定位范围 |
+| `bishe/sql/27_amap_credentials.sql` | 高德 Web 服务和 Web 端凭据 |
 
 `07` 文件名里的 `manual` 是历史命名，现在也由程序自动执行；保留原文件名是为了兼容已经记录的迁移版本。编号有间隔正常，已经合并或被替代的旧脚本已清理，不需要补回。
 
@@ -135,7 +137,9 @@ npm stop       # 关闭本项目前端、后端，保留 Redis 和 MySQL
 
 师生商城支持组合使用关键词、价格区间、标签和发货城市。点击标签立即刷新结果。商品标签可留空，「其他」筛出无标签商品。买家可手选发货城市，或主动使用定位选同城，页面按城市筛选。定位需要允许定位的 HTTPS 或 localhost 环境。
 
-初代管理员可在「账号管理 → 高德地图配置」保存高德 Web 服务 Key。保存值加密存储，部署配置中的 `AMAP_WEB_KEY` 用作回退。已有库若没有登记初代管理员，由部署方在 `.env` 中填写核实过的 `INITIAL_ADMIN_ID`，该账号首次保存地图配置时登记归属。未设置 `ADMIN_BOOTSTRAP_SECRET` 时关闭空库初始化。轮换令牌密钥前，如地图配置沿用了原令牌密钥加密，须把原值保留在部署环境的 `ADMIN_SETTINGS_SECRET` 中。未配置高德或定位失败时，商家仍可手填发货城市，买家仍可手选。[高德逆地理编码说明](https://lbs.amap.com/api/webservice/guide/api/georegeo)
+初代管理员可在「账号管理 → 高德地图配置」添加高德凭据。Web 服务 Key 用于城市识别、收货地址解析和签到坐标转换，主用凭据遇到限流、额度耗尽或失效时按顺序尝试备用凭据。旧版保存的 Key 和部署配置中的 `AMAP_WEB_KEY` 用作回退。教师和学生的定位签到地图使用 Web 端 Key 及其配套安全密钥，安全密钥由后端加密保存并通过代理使用。浏览器定位需要 HTTPS 或 localhost。未配置高德或定位失败时，商家仍可手填发货城市，买家仍可手选。
+
+已有库若没有登记初代管理员，由部署方在 `.env` 中填写核实过的 `INITIAL_ADMIN_ID`，该账号首次保存地图配置时登记归属。未设置 `ADMIN_BOOTSTRAP_SECRET` 时关闭空库初始化。轮换令牌密钥前，如地图配置沿用了原令牌密钥加密，须把原值保留在部署环境的 `ADMIN_SETTINGS_SECRET` 中。
 
 已有管理员的旧库可直接指定一个受信任的现有账号作为初代。若希望使用单独的账号，先由现有管理员在「账号管理 → 创建新管理员」创建并记录页面显示的登录 ID，再将该 ID 填入本地 `.env` 的 `INITIAL_ADMIN_ID`。重启后端后，用指定账号登录并保存地图配置即可登记归属。
 

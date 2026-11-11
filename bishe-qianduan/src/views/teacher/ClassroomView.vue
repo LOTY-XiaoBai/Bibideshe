@@ -1,5 +1,6 @@
 <template>
-  <div v-loading="loading" class="classroom-page">
+  <div>
+  <div v-show="!displayCheckInId" v-loading="loading" class="classroom-page">
     <header class="class-header">
       <div><el-button text @click="router.push('/teacher/courses')"><i aria-hidden="true" class="ph ph-arrow-left" /> 返回我的授课</el-button><h2>{{ course?.courseName || '课堂' }}</h2><p>{{ mode === 'ONLINE' ? '网络授课' : '本地授课' }} · {{ teaching ? '正在上课' : session ? '等待恢复直播' : '准备上课' }}<span v-if="mode === 'ONLINE' && teaching"> · {{ viewers }} 位学生已连接</span></p></div>
       <div class="header-actions"><el-radio-group v-if="!session" v-model="mode" :disabled="starting" @change="releaseMedia"><el-radio-button value="LOCAL">本地授课</el-radio-button><el-radio-button value="ONLINE">网络授课</el-radio-button></el-radio-group><el-button v-if="!teaching" type="primary" :loading="starting" :disabled="loading || !course" @click="begin">{{ session ? '恢复直播' : '开始上课' }}</el-button><el-button v-if="session" type="danger" plain @click="finish">结束本次上课</el-button></div>
@@ -19,8 +20,12 @@
       <div class="roll-toolbar"><div><h3>课堂随机点名</h3><p>共 {{ members.length }} 位学生，每轮抽取的学生不重复</p></div><div class="draw-controls"><span>一次抽取</span><el-input-number v-model="drawCount" :min="1" :max="Math.max(1, members.length)" :precision="0" /><el-button type="primary" :disabled="!teaching || !members.length" :loading="drawing" @click="draw">{{ selected.length ? '再抽一次' : '开始点名' }}</el-button></div></div>
       <div class="draw-stage" aria-live="polite"><div v-if="!selected.length" class="draw-empty"><i aria-hidden="true" class="ph ph-student" /><p>{{ teaching ? '点击开始点名，随机抽取课堂成员' : '开始上课后即可点名' }}</p></div><div v-for="person in selected" :key="person.studentId" class="student-spot"><el-avatar :size="100" :src="person.avatar">{{ (person.nickname || '学生').slice(0, 1) }}</el-avatar><strong>{{ person.nickname || person.studentId }}</strong><span>{{ person.studentId }}</span></div></div>
     </section>
-    <ClassCheckInPanel v-if="course" v-show="module === 'checkin'" :course-id="course.courseId" :active="teaching" />
+    <ClassCheckInPanel v-if="course" v-show="module === 'checkin'" :course-id="course.courseId"
+      :active="teaching" :displaying="!!displayCheckInId" @display="openCheckInDisplay" />
     <ClassQuizPanel v-if="course" v-show="module === 'quiz'" :course-id="course.courseId" :session-id="session?.sessionId" :active="teaching" />
+  </div>
+  <CheckInDisplay v-if="displayCheckInId" :key="displayCheckInId" :check-in-id="displayCheckInId"
+    :course-id="route.params.courseId" @close="closeCheckInDisplay" />
   </div>
 </template>
 
@@ -32,16 +37,26 @@ import { fetchTeacherCourses, fetchCourseMembers } from '@/api/course'
 import { activeClass, startClass, heartbeatClass, endClass } from '@/api/classroom'
 import { createClassroomRtc } from '@/utils/classroomRtc'
 import ClassCheckInPanel from '@/components/ClassCheckInPanel.vue'
+import CheckInDisplay from '@/components/CheckInDisplay.vue'
 import ClassQuizPanel from '@/components/ClassQuizPanel.vue'
 import StreamVideo from '@/components/StreamVideo.vue'
 
 const route = useRoute(), router = useRouter()
 const course = ref(null), members = ref([]), session = ref(null), loading = ref(true), starting = ref(false), ready = ref(false)
-const mode = ref(route.query.mode === 'ONLINE' ? 'ONLINE' : 'LOCAL'), module = ref('roll'), drawCount = ref(1), selected = ref([]), drawing = ref(false), viewers = ref(0)
+const mode = ref(route.query.mode === 'ONLINE' ? 'ONLINE' : 'LOCAL'), module = ref(route.query.checkIn ? 'checkin' : 'roll'), drawCount = ref(1), selected = ref([]), drawing = ref(false), viewers = ref(0)
 const camera = shallowRef(null), screen = shallowRef(null), deviceBusy = ref(''), mediaError = ref('')
 const hasCamera = computed(() => camera.value?.getVideoTracks().some(t => t.readyState === 'live'))
 const hasMic = computed(() => camera.value?.getAudioTracks().some(t => t.readyState === 'live'))
 const teaching = computed(() => !!session.value && ready.value)
+const displayCheckInId = computed(() => /^\d+$/.test(route.query.checkIn || '') ? String(route.query.checkIn) : '')
+function openCheckInDisplay(id) {
+  return router.push({ path: route.path, query: { ...route.query, checkIn: String(id) } })
+}
+function closeCheckInDisplay() {
+  const query = { ...route.query }
+  delete query.checkIn
+  return router.replace({ path: route.path, query })
+}
 let rtc, heartbeat, rollTimer, disposed = false, ending = false
 function secureMedia() {
   if (!window.isSecureContext || !navigator.mediaDevices) throw new Error('直播需要使用 HTTPS 或 localhost，并允许浏览器访问设备')

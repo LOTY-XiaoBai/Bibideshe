@@ -13,6 +13,8 @@
         <result column="attendee_count" property="attendeeCount"/>
         <result column="status" property="status"/>
         <result column="score_value" property="scoreValue"/>
+        <result column="mode" property="mode"/>
+        <result column="configuration" property="configuration"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.example.bishe.entity.CheckInRecord"
@@ -23,14 +25,34 @@
                 #{endTime}, #{attendeeCount}, #{status}, #{scoreValue})
     </insert>
 
+    <insert id="insertChallenge">
+        INSERT INTO check_in_challenge(check_in_id, mode, configuration)
+        VALUES (#{checkInId}, #{mode}, #{configuration})
+    </insert>
+
+    <sql id="recordWithChallenge">
+        SELECT r.*, COALESCE(ch.mode, 'LEGACY') AS mode, ch.configuration
+        FROM check_in_record r LEFT JOIN check_in_challenge ch ON ch.check_in_id = r.check_in_id
+    </sql>
+
     <select id="findById" resultMap="CheckInRecordResultMap">
-        SELECT * FROM check_in_record WHERE check_in_id = #{checkInId}
+        <include refid="recordWithChallenge"/> WHERE r.check_in_id = #{checkInId}
+    </select>
+
+    <select id="findByIdForUpdate" resultMap="CheckInRecordResultMap" flushCache="true">
+        <include refid="recordWithChallenge"/> WHERE r.check_in_id = #{checkInId} FOR UPDATE
+    </select>
+
+    <select id="findLatestLocation" resultType="String">
+        SELECT ch.configuration FROM check_in_record r JOIN check_in_challenge ch ON ch.check_in_id = r.check_in_id
+        WHERE r.course_id = #{courseId} AND r.publisher_id = #{teacherId} AND ch.mode = 'LOCATION'
+        ORDER BY r.publish_time DESC, r.check_in_id DESC LIMIT 1
     </select>
 
     <select id="findByCourseId" resultMap="CheckInRecordResultMap">
-        SELECT * FROM check_in_record
-        WHERE course_id = #{courseId}
-        ORDER BY publish_time DESC
+        <include refid="recordWithChallenge"/>
+        WHERE r.course_id = #{courseId}
+        ORDER BY r.publish_time DESC, r.check_in_id DESC
         LIMIT #{offset}, #{limit}
     </select>
 
@@ -41,7 +63,7 @@
     <update id="endCheckIn">
         UPDATE check_in_record
         SET status = 1, end_time = #{endTime}
-        WHERE check_in_id = #{checkInId}
+        WHERE check_in_id = #{checkInId} AND status = 0
     </update>
 
     <update id="updateAttendeeCount">

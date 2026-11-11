@@ -108,7 +108,7 @@ public class ClassroomService {
     }
 
     public List<Map<String, Object>> pendingCheckIns(Long studentId) {
-        return jdbc.queryForList("SELECT r.check_in_id AS checkInId,r.course_id AS courseId,c.course_name AS courseName,r.deadline FROM check_in_record r JOIN check_in_user u ON u.check_in_id=r.check_in_id JOIN course c ON c.course_id=r.course_id JOIN course_personnel p ON p.course_id=r.course_id AND p.student_id=u.student_id WHERE u.student_id=? AND u.status=0 AND r.status=0 AND r.deadline>CURRENT_TIMESTAMP AND c.is_finished=0 AND EXISTS(SELECT 1 FROM course_session cs WHERE cs.course_id=r.course_id AND cs.ended_at IS NULL AND cs.heartbeat_at>DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 60 SECOND)) ORDER BY r.deadline", studentId);
+        return jdbc.queryForList("SELECT r.check_in_id AS checkInId,r.course_id AS courseId,c.course_name AS courseName,r.deadline,COALESCE(ch.mode,'LEGACY') AS mode FROM check_in_record r LEFT JOIN check_in_challenge ch ON ch.check_in_id=r.check_in_id JOIN check_in_user u ON u.check_in_id=r.check_in_id JOIN course c ON c.course_id=r.course_id JOIN course_personnel p ON p.course_id=r.course_id AND p.student_id=u.student_id WHERE u.student_id=? AND u.status=0 AND r.status=0 AND r.deadline>CURRENT_TIMESTAMP AND c.is_finished=0 AND EXISTS(SELECT 1 FROM course_session cs WHERE cs.course_id=r.course_id AND cs.ended_at IS NULL AND cs.heartbeat_at>DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 60 SECOND)) ORDER BY r.deadline", studentId);
     }
 
     public void signal(AuthUser user, String sessionId, Long targetId, String kind, Map<String, Object> data) {

@@ -44,6 +44,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/admin/register/available",
                         "/api/captcha",
                         "/api/captcha/**",
+                        "/api/location/_AMapService/v3/ip",
+                        "/api/location/_AMapService/v4/map/styles",
                         "/v3/api-docs",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",

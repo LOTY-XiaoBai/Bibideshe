@@ -122,13 +122,29 @@
           <article v-for="item in activeCheckIns" :key="item.checkInId" class="task-card">
             <div>
               <h4>{{ item.courseName || `课程 ${item.courseId}` }}</h4>
-              <p>签到 #{{ item.checkInId }} · 截止 {{ formatTime(item.deadline) }}</p>
+              <p>{{ checkInModeLabels[item.mode] || '一键签到' }} · #{{ item.checkInId }} · 截止 {{ formatTime(item.deadline) }}</p>
             </div>
-            <el-button type="primary" :loading="signingId === item.checkInId" @click="handleSign(item.checkInId)">
+            <el-button type="primary" :loading="signingId === item.checkInId" @click="openSign(item)">
               立即签到
             </el-button>
           </article>
         </div>
+        <el-dialog v-model="signDialog" :title="checkInModeLabels[signingItem?.mode]"
+          :width="signingItem?.mode === 'LOCATION' ? 'min(560px, 94vw)' : 'min(420px, 94vw)'"
+          :close-on-click-modal="!signingId" :close-on-press-escape="!signingId" :show-close="!signingId"
+          append-to-body destroy-on-close>
+          <template v-if="signingItem?.mode === 'LOCATION'">
+            <CheckInLocationMap v-if="signDialog" :check-in-id="signingItem.checkInId"
+              :submitting="!!signingId" @position="signPosition = $event" />
+          </template>
+          <CheckInGesture v-else-if="signingItem?.mode === 'GESTURE'" v-model="signGesture" />
+          <el-input v-else v-model="signCode" placeholder="输入大屏上的 4 位签到码" inputmode="numeric" maxlength="4"
+            @keyup.enter="submitCredential" />
+          <template #footer>
+            <el-button :disabled="!!signingId" @click="signDialog = false">取消</el-button>
+            <el-button type="primary" :loading="!!signingId" :disabled="!validCredential" @click="submitCredential">提交签到</el-button>
+          </template>
+        </el-dialog>
       </div>
 
       <div v-else-if="checkinSubTab === 'records'" v-loading="checkinLoading">
@@ -183,9 +199,19 @@ import {fetchExamsByCourse,fetchStudentExamRecords} from '@/api/exam'
 import {fetchHomeworksByCourse,fetchStudentHomeworkRecords} from '@/api/homework'
 import {signCheckIn,fetchStudentCheckInRecords,fetchMissedByCourse,fetchAllMissed} from '@/api/checkIn'
 import StudentQuizList from '@/components/StudentQuizList.vue'
+import CheckInGesture from '@/components/CheckInGesture.vue'
+import CheckInLocationMap from '@/components/CheckInLocationMap.vue'
 const route=useRoute(),router=useRouter(),userStore=useUserStore(),classroom=useClassroomStore(),isCheckInPage=computed(()=>route.path==='/student/check-in')
 const activeTab=ref(isCheckInPage.value?'checkin':['exam','homework','quiz'].includes(route.query.tab)?route.query.tab:'exam'),checkinSubTab=ref('active'),loading=ref(false),checkinLoading=ref(false),signingId=ref(null),courses=ref([]),selectedCourseId=ref(0),exams=ref([]),homeworks=ref([]),examRecordMap=reactive({}),homeworkRecordMap=reactive({}),checkinRecords=ref([]),missedRecords=ref([])
 const activeCheckIns=computed(()=>classroom.checkIns.filter(r=>!selectedCourseId.value||String(r.courseId)===String(selectedCourseId.value)))
+const checkInModeLabels = { CODE: '签到码签到', GESTURE: '手势签到', LOCATION: '定位签到' }
+const signDialog = ref(false), signingItem = ref(null), signCode = ref(''), signGesture = ref([])
+const signPosition = ref(null)
+const validCredential = computed(() => {
+  if (signingItem.value?.mode === 'LOCATION') return !!signPosition.value
+  if (signingItem.value?.mode === 'GESTURE') return signGesture.value.length >= 4
+  return /^\d{4}$/.test(signCode.value)
+})
 const formatScore=v=>v==null?'-':Number(v).toFixed(1),formatTime=v=>v?String(v).replace('T',' ').slice(0,16):'-',isPast=v=>v&&new Date(v).getTime()<Date.now(),canViewResult=t=>Number(t?.hideResultUntilPublish)!==1||Number(t?.isResultPublished)===1,isExamSubmitted=e=>examRecordMap[e.examId]?.submitted===true
 const checkinStatusLabel=s=>Number(s)===1?'已签到':Number(s)===2?'迟到':'缺勤',checkinStatusType=s=>Number(s)===1?'success':Number(s)===2?'warning':'danger'
 const selectedCourses=()=>selectedCourseId.value?courses.value.filter(c=>String(c.courseId)===String(selectedCourseId.value)):courses.value
@@ -195,7 +221,36 @@ async function loadCheckinData(){checkinLoading.value=true;try{const [a,b]=await
 async function reloadAll(){loading.value=true;try{courses.value=(await fetchStudentCourses()).data||[];await(isCheckInPage.value?loadCheckinData():Promise.all([loadExamData(),loadHomeworkData()]))}catch{}finally{loading.value=false}}
 async function onCourseChange(){loading.value=true;try{await(isCheckInPage.value?loadCheckinData():Promise.all([loadExamData(),loadHomeworkData()]))}catch{}finally{loading.value=false}}
 const openExam=e=>router.push(`/student/assessment/exam/${e.examId}`),openHomework=h=>router.push(`/student/assessment/homework/${h.homeworkId}`),viewExamReview=id=>router.push(`/student/assessment/exam/${id}`),viewHomeworkReview=id=>router.push(`/student/assessment/homework/${id}`)
-async function handleSign(id){signingId.value=id;try{await signCheckIn(id);await classroom.refresh();await loadCheckinData();ElMessage.success('签到成功')}catch{}finally{signingId.value=null}}
+function openSign(item) {
+  if (signingId.value) return
+  if (['CODE', 'GESTURE', 'LOCATION'].includes(item.mode)) {
+    signingItem.value = item
+    signCode.value = ''
+    signGesture.value = []
+    signPosition.value = null
+    signDialog.value = true
+  } else {
+    handleSign(item.checkInId)
+  }
+}
+function submitCredential() {
+  if (!signingItem.value || !validCredential.value) return
+  const credentials = { LOCATION: { position: signPosition.value }, GESTURE: { gesture: signGesture.value },
+    CODE: { code: signCode.value } }
+  const credential = credentials[signingItem.value.mode]
+  handleSign(signingItem.value.checkInId, credential)
+}
+async function handleSign(id, credential) {
+  if (signingId.value) return
+  signingId.value = id
+  try {
+    await signCheckIn(id, credential)
+    signDialog.value = false
+    await classroom.refresh()
+    await loadCheckinData()
+    ElMessage.success('签到成功')
+  } catch {} finally { signingId.value = null }
+}
 watch(()=>route.query.tab,v=>{if(['exam','homework','quiz'].includes(v)&&!isCheckInPage.value)activeTab.value=v});watch(isCheckInPage,v=>{activeTab.value=v?'checkin':['exam','homework','quiz'].includes(route.query.tab)?route.query.tab:'exam';reloadAll()})
 let timer
 function changed(){if(isCheckInPage.value)loadCheckinData()}

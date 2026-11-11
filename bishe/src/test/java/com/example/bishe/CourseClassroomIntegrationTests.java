@@ -4,20 +4,36 @@ import com.example.bishe.common.*;
 import com.example.bishe.dto.*;
 import com.example.bishe.entity.Course;
 import com.example.bishe.service.*;
+import com.example.bishe.util.TokenUtil;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.web.context.WebApplicationContext;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties="app.token.secret=test-token-secret-with-at-least-32-characters")
+@SpringBootTest(properties={"app.token.secret=test-token-secret-with-at-least-32-characters",
+        "app.merchant.amap-key=attendance-test-key"})
 @EnabledIfEnvironmentVariable(named="RUN_DB_INTEGRATION", matches="true")
 @Transactional
 class CourseClassroomIntegrationTests {
@@ -25,6 +41,27 @@ class CourseClassroomIntegrationTests {
     @Autowired ClassroomService classroom;
     @Autowired CheckInService checkIns;
     @Autowired JdbcTemplate db;
+    @Autowired WebApplicationContext web;
+    @Autowired ObjectMapper json;
+    private static HttpServer amap;
+
+    @DynamicPropertySource
+    static void mockMap(DynamicPropertyRegistry properties) throws java.io.IOException {
+        amap = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        amap.createContext("/v3/assistant/coordinate/convert", exchange -> {
+            String result = exchange.getRequestURI().getQuery().contains("116.290000,39.800000")
+                    ? "116.300000,39.800000" : "116.410000,39.800000";
+            byte[] body = ("{\"status\":\"1\",\"locations\":\"" + result + "\"}").getBytes(StandardCharsets.UTF_8);
+            try (exchange) {
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+            }
+        });
+        amap.start();
+        properties.add("app.amap.rest-base-url", () -> "http://127.0.0.1:" + amap.getAddress().getPort());
+    }
+
+    @AfterAll static void stopMap() { if (amap != null) amap.stop(0); }
     long teacher, a, b;
     long id() { return 7_000_000_000_000L + ThreadLocalRandom.current().nextLong(1_000_000_000_000L); }
     long student() { long id=id(); db.update("INSERT INTO student(student_id,nickname,password,avatar) VALUES(?,'课堂测试学生','disabled-test-account','/test-avatar.png')", id); return id; }
@@ -72,6 +109,116 @@ class CourseClassroomIntegrationTests {
         assertThat(db.queryForObject("SELECT status FROM check_in_record WHERE check_in_id=?",Integer.class,check.getCheckInId())).isEqualTo(1);
         assertThatThrownBy(()->checkIns.publishCheckIn(attendance(id))).hasMessageContaining("先开始上课");
     }
+    @Test void codeCheckInRejectsSubmissionWithoutTheCode() throws Exception {
+        var mvc = MockMvcBuilders.webAppContextSetup(web).build();
+        long checkInId = publish(mvc, startClassWithStudent(), Map.of("mode", "CODE"));
+        mvc.perform(sign(checkInId, Map.of())).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/check-in/display/{id}", checkInId).header("Authorization", bearer(studentAuth(a))))
+                .andExpect(status().isForbidden());
+        String code = display(mvc, checkInId).path("code").asText();
+        assertThat(code).matches("[0-9]{4}");
+        mvc.perform(sign(checkInId, Map.of("code", code))).andExpect(status().isOk());
+    }
+
+    @Test void previousCodeWorksBrieflyAfterRotationAndThenExpires() throws Exception {
+        var mvc = MockMvcBuilders.webAppContextSetup(web).build();
+        long courseId = startClassWithStudent();
+        courses.joinCourse(b, courseId);
+        long checkInId = publish(mvc, courseId, Map.of("mode", "CODE"));
+        var initial = display(mvc, checkInId);
+        String previous = initial.path("code").asText();
+        Thread.sleep(initial.path("refreshMs").asLong() + 100);
+        assertThat(display(mvc, checkInId).path("code").asText()).isNotEqualTo(previous);
+        mvc.perform(sign(checkInId, Map.of("code", previous))).andExpect(status().isOk());
+
+        Thread.sleep(2_100);
+        mvc.perform(signAs(b, checkInId, Map.of("code", previous))).andExpect(status().isBadRequest());
+        String current = display(mvc, checkInId).path("code").asText();
+        mvc.perform(post("/api/check-in/end").param("checkInId", Long.toString(checkInId))
+                .header("Authorization", teacherBearer())).andExpect(status().isOk());
+        mvc.perform(signAs(b, checkInId, Map.of("code", current))).andExpect(status().isBadRequest());
+        assertThat(display(mvc, checkInId).has("code")).isFalse();
+    }
+
+    @Test void gestureCheckInRequiresTheDisplayedSequenceInOrder() throws Exception {
+        var mvc = MockMvcBuilders.webAppContextSetup(web).build();
+        long checkInId = publish(mvc, startClassWithStudent(),
+                Map.of("mode", "GESTURE", "gesture", List.of(1, 2, 3, 6)));
+        mvc.perform(get("/api/check-in/display/{id}", checkInId).header("Authorization", teacherBearer()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.gesture[0]").value(1))
+                .andExpect(jsonPath("$.data.gesture[3]").value(6));
+        mvc.perform(sign(checkInId, Map.of("gesture", List.of(6, 3, 2, 1)))).andExpect(status().isBadRequest());
+        mvc.perform(sign(checkInId, Map.of("gesture", List.of(1, 2, 3, 6)))).andExpect(status().isOk());
+        assertThat(classroom.pendingCheckIns(a)).isEmpty();
+    }
+
+    @Test void locationCheckInUsesTheSavedRectangleAndChecksTheConvertedPoint() throws Exception {
+        var mvc = MockMvcBuilders.webAppContextSetup(web).build();
+        long courseId = startClassWithStudent();
+        long checkInId = publish(mvc, courseId,
+                Map.of("mode", "LOCATION", "bounds", Map.of("west", 116.3, "south", 39.7, "east", 116.4, "north", 39.9)));
+        mvc.perform(get("/api/check-in/location-default/{courseId}", courseId).header("Authorization", teacherBearer()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.west").value(116.3))
+                .andExpect(jsonPath("$.data.north").value(39.9));
+        var outside = Map.of("latitude", 39.8, "longitude", 116.40, "accuracy", 77);
+        mvc.perform(post("/api/check-in/location-preview/{id}", checkInId).header("Authorization", bearer(studentAuth(a)))
+                        .contentType("application/json").content(json.writeValueAsString(outside)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.inside").value(false));
+        mvc.perform(sign(checkInId, Map.of("position", outside)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("当前位置在签到范围外"));
+        var position = Map.of("latitude", 39.8, "longitude", 116.29, "accuracy", 77);
+        mvc.perform(get("/api/location/map-config").param("checkInId", Long.toString(checkInId))
+                        .header("Authorization", bearer(studentAuth(b))))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("您未加入该课程, 无法签到"));
+        mvc.perform(post("/api/check-in/location-preview/{id}", checkInId).header("Authorization", bearer(studentAuth(a)))
+                        .contentType("application/json").content(json.writeValueAsString(position)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.inside").value(true))
+                .andExpect(jsonPath("$.data.point.longitude").value(116.3));
+        assertThat(classroom.pendingCheckIns(a)).hasSize(1);
+        mvc.perform(sign(checkInId, Map.of("position", position)))
+                .andExpect(status().isOk());
+    }
+
+    private long startClassWithStudent() {
+        long courseId = courses.createCourse(request(false, null)).getCourseId();
+        courses.joinCourse(a, courseId);
+        classroom.start(teacher, courseId, "LOCAL");
+        return courseId;
+    }
+
+    private long publish(MockMvc mvc, long courseId, Map<String, Object> configuration) throws Exception {
+        var body = new HashMap<>(configuration);
+        body.put("courseId", courseId);
+        body.put("deadline", LocalDateTime.now().plusMinutes(5));
+        body.put("scoreValue", 1);
+        var published = mvc.perform(post("/api/check-in/publish")
+                .header("Authorization", teacherBearer())
+                .contentType("application/json")
+                .content(json.writeValueAsString(body)))
+                .andExpect(status().isOk()).andReturn();
+        return json.readTree(published.getResponse().getContentAsString()).path("data").path("checkInId").asLong();
+    }
+
+    private tools.jackson.databind.JsonNode display(MockMvc mvc, long checkInId) throws Exception {
+        var result = mvc.perform(get("/api/check-in/display/{id}", checkInId).header("Authorization", teacherBearer()))
+                .andExpect(status().isOk()).andReturn();
+        return json.readTree(result.getResponse().getContentAsString()).path("data");
+    }
+
+    private MockHttpServletRequestBuilder sign(long checkInId, Map<String, Object> credential) {
+        return signAs(a, checkInId, credential);
+    }
+
+    private MockHttpServletRequestBuilder signAs(long student, long checkInId, Map<String, Object> credential) {
+        var body = new HashMap<>(credential);
+        body.put("checkInId", checkInId);
+        return post("/api/check-in/sign").header("Authorization", bearer(studentAuth(student)))
+                .contentType("application/json")
+                .content(json.writeValueAsString(body));
+    }
+
+    private String teacherBearer() { return bearer(new AuthUser(teacher, Long.toString(teacher), UserRole.TEACHER)); }
+    private String bearer(AuthUser actor) { return "Bearer " + TokenUtil.createToken(actor); }
     @Test void onlineSignalsRejectOutsidersImpersonationAndExpiredSessions() {
         Long id=courses.createCourse(request(false,null)).getCourseId(); courses.joinCourse(a,id);
         String session=classroom.start(teacher,id,"ONLINE").get("sessionId").toString();

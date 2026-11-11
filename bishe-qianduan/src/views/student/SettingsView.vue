@@ -67,7 +67,7 @@
         </el-table>
       </section>
     </div>
-    <ExtraProfile />
+    <ExtraProfile allow-location />
   </div>
 </template>
 

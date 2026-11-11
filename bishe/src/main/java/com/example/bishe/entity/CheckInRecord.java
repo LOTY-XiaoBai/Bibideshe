@@ -1,6 +1,7 @@
 package com.example.bishe.entity;
 
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,4 +38,8 @@ public class CheckInRecord {
 
     /** 本次签到分值(计入课程签到得分) */
     private BigDecimal scoreValue;
+
+    private String mode = "LEGACY";
+    @JsonIgnore
+    private String configuration;
 }

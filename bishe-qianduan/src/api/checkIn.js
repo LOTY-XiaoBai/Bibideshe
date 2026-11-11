@@ -16,6 +16,10 @@ export function fetchCheckInDetail(checkInId) {
   return request.get(`/api/check-in/detail/${checkInId}`)
 }
 
+export function fetchCheckInDisplay(checkInId) {
+  return request.get(`/api/check-in/display/${checkInId}`, { silent: true })
+}
+
 export function fetchAbsentStudents(checkInId) {
   return request.get(`/api/check-in/absent/${checkInId}`)
 }
@@ -24,8 +28,8 @@ export function updateCheckInStatus(data) {
   return request.post('/api/check-in/update-status', data)
 }
 
-export function signCheckIn(checkInId) {
-  return request.post('/api/check-in/sign', { checkInId })
+export function signCheckIn(checkInId, credential) {
+  return request.post('/api/check-in/sign', { checkInId, ...credential })
 }
 
 export function fetchStudentCheckInRecords(studentId, page = 1, size = 20) {
